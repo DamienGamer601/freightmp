@@ -22,12 +22,16 @@ const refreshSchema = z.object({
 });
 
 function cookieBaseOptions() {
+  const secure = env.apiUrl.startsWith("https://");
   return {
     httpOnly: true,
-    sameSite: "lax" as const,
+    // En production, le site (Vercel) et l'API (Railway) sont sur des domaines
+    // différents : le cookie doit être SameSite=None + Secure pour être envoyé
+    // lors des appels fetch cross-site avec `credentials: "include"`.
+    // En développement (http), SameSite=None exige Secure → on garde Lax.
+    sameSite: (secure ? "none" : "lax") as "none" | "lax",
     path: "/",
-    // `Secure` uniquement derrière HTTPS (déduit de l'URL publique de l'API).
-    secure: env.apiUrl.startsWith("https://"),
+    secure,
   };
 }
 
