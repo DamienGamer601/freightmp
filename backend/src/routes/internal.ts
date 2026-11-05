@@ -68,4 +68,47 @@ router.post(
   }),
 );
 
+/** GET /api/v1/internal/users — liste des comptes (diagnostic). */
+router.get(
+  "/users",
+  asyncHandler(async (_req, res) => {
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        username: true,
+        steamId: true,
+        discordId: true,
+        role: true,
+        createdAt: true,
+      },
+    });
+    res.json({ users });
+  }),
+);
+
+const detachSchema = z.object({
+  provider: z.enum(["steam", "discord"]),
+  value: z.string().min(1),
+});
+
+/**
+ * POST /api/v1/internal/users/detach — détache un fournisseur OAuth de tous les
+ * comptes qui le portent (maintenance : résout les "déjà lié à un autre compte").
+ */
+router.post(
+  "/users/detach",
+  asyncHandler(async (req, res) => {
+    const body = detachSchema.parse(req.body);
+    const field = body.provider === "steam" ? "steamId" : "discordId";
+
+    const result = await prisma.user.updateMany({
+      where: { [field]: body.value },
+      data: { [field]: null },
+    });
+
+    res.json({ ok: true, detached: result.count, provider: body.provider });
+  }),
+);
+
 export default router;
