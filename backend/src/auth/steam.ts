@@ -2,12 +2,23 @@ const STEAM_OPENID_URL = "https://steamcommunity.com/openid/login";
 const OPENID_NS = "http://specs.openid.net/auth/2.0";
 const OPENID_IDENTIFIER_SELECT = "http://specs.openid.net/auth/2.0/identifier_select";
 
-export function buildSteamLoginUrl(returnUrl: string): string {
+export function buildSteamLoginUrl(returnUrl: string, realm?: string): string {
+  // `openid.realm` DOIT correspondre au domaine qui reçoit le callback.
+  // On le dérive de l'URL de retour (localhost en dev, domaine Railway en prod).
+  let resolvedRealm = realm;
+  if (!resolvedRealm) {
+    try {
+      resolvedRealm = new URL(returnUrl).origin;
+    } catch {
+      resolvedRealm = "http://localhost:4000";
+    }
+  }
+
   const params = new URLSearchParams({
     "openid.ns": OPENID_NS,
     "openid.mode": "checkid_setup",
     "openid.return_to": returnUrl,
-    "openid.realm": "http://localhost:4000",
+    "openid.realm": resolvedRealm,
     "openid.identity": OPENID_IDENTIFIER_SELECT,
     "openid.claimed_id": OPENID_IDENTIFIER_SELECT,
   });
