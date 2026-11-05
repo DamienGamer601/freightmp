@@ -111,4 +111,25 @@ router.post(
   }),
 );
 
+const roleSchema = z.object({
+  userId: z.string().min(1),
+  role: z.enum(["DRIVER", "MODERATOR", "ADMIN", "DEV"]),
+});
+
+/** POST /api/v1/internal/users/role — change le rôle d'un compte (bootstrap admin). */
+router.post(
+  "/users/role",
+  asyncHandler(async (req, res) => {
+    const body = roleSchema.parse(req.body);
+
+    const user = await prisma.user.update({
+      where: { id: body.userId },
+      data: { role: body.role },
+      select: { id: true, username: true, role: true },
+    });
+
+    res.json({ ok: true, user });
+  }),
+);
+
 export default router;
