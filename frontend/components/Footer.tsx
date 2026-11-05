@@ -2,9 +2,9 @@ import Link from "next/link";
 import { getDiscordAuthUrl, getSteamAuthUrl } from "@/lib/api";
 
 const navLinks = [
-  { label: "Accueil", href: "#accueil" },
-  { label: "Fonctionnalités", href: "#fonctionnalites" },
-  { label: "Serveurs", href: "#serveurs" },
+  { label: "Accueil", href: "/" },
+  { label: "Fonctionnalités", href: "/#fonctionnalites" },
+  { label: "Serveurs", href: "/#serveurs" },
 ];
 
 export default function Footer() {
@@ -17,7 +17,7 @@ export default function Footer() {
       <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
-            <a href="#accueil" className="flex items-center gap-2.5">
+            <a href="/" className="flex items-center gap-2.5">
               <img
                 src="/freightmp-logo.png"
                 alt="FreightMP"
