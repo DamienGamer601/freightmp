@@ -1,0 +1,327 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  DEV
+  MODERATOR
+  DRIVER
+}
+
+enum Game {
+  ETS2
+  ATS
+}
+
+enum ServerStatus {
+  ONLINE
+  OFFLINE
+  MAINTENANCE
+}
+
+enum BanType {
+  WARNING
+  TEMPORARY
+  PERMANENT
+}
+
+enum VtcRole {
+  OWNER
+  MANAGER
+  MEMBER
+}
+
+enum FriendStatus {
+  PENDING
+  ACCEPTED
+}
+
+enum EventType {
+  CONVOY
+  DELIVERY
+  SPECIAL
+}
+
+enum EventStatus {
+  UPCOMING
+  ONGOING
+  FINISHED
+  CANCELLED
+}
+
+model User {
+  id                  String            @id @default(uuid())
+  steamId             String?           @unique @map("steam_id")
+  discordId           String?           @unique @map("discord_id")
+  username            String            @unique
+  avatarUrl           String?           @map("avatar_url")
+  country             String?
+  bio                 String?
+  bannerUrl           String?           @map("banner_url")
+  title               String?
+  accentColor         String?           @map("accent_color")
+  role                Role              @default(DRIVER)
+  kilometersDriven    Float             @default(0) @map("kilometers_driven")
+  deliveriesCompleted Int               @default(0) @map("deliveries_completed")
+  totalPlayTimeSeconds Int              @default(0) @map("total_play_time_seconds")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+  deliveries          Delivery[]
+  bansReceived        Ban[]             @relation("BanTarget")
+  bansIssued          Ban[]             @relation("BanIssuer")
+  vtcOwned            VTC[]
+  affiliations        VTC_Affiliation[]
+  refreshTokens       RefreshToken[]
+  auditLogs           AuditLog[]        @relation("AuditActor")
+  announcements       Announcement[]
+  notifications       Notification[]
+  friendRequestsSent     Friendship[]  @relation("FriendRequester")
+  friendRequestsReceived Friendship[]  @relation("FriendAddressee")
+  messagesSent           Message[]     @relation("MessageSender")
+  messagesReceived       Message[]     @relation("MessageReceiver")
+  eventsOrganized        Event[]
+  eventParticipations    EventParticipant[]
+  apiKeys                ApiKey[]
+  webhooks               Webhook[]
+
+  @@map("users")
+}
+
+model Server {
+  id              String       @id @default(uuid())
+  name            String
+  slug            String       @unique
+  game            Game
+  status          ServerStatus @default(OFFLINE)
+  maxPlayers      Int          @default(100) @map("max_players")
+  onlinePlayers   Int          @default(0) @map("online_players")
+  host            String
+  port            Int
+  region          String?
+  version         String?
+  lastHeartbeatAt DateTime?    @map("last_heartbeat_at")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  deliveries      Delivery[]
+  events          Event[]
+
+  @@map("servers")
+}
+
+model Delivery {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serverId    String?   @map("server_id")
+  server      Server?   @relation(fields: [serverId], references: [id], onDelete: SetNull)
+  cargoName   String    @map("cargo_name")
+  fromCity    String    @map("from_city")
+  toCity      String    @map("to_city")
+  distanceKm  Float     @map("distance_km")
+  income      Float     @default(0)
+  startedAt   DateTime  @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("deliveries")
+}
+
+model Ban {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  user      User      @relation("BanTarget", fields: [userId], references: [id], onDelete: Cascade)
+  issuerId  String    @map("issuer_id")
+  issuer    User      @relation("BanIssuer", fields: [issuerId], references: [id], onDelete: Restrict)
+  type      BanType
+  reason    String
+  active    Boolean   @default(true)
+  expiresAt DateTime? @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("bans")
+}
+
+model VTC {
+  id        String            @id @default(uuid())
+  name      String
+  tag       String            @unique
+  ownerId   String            @map("owner_id")
+  owner     User              @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  createdAt DateTime          @default(now()) @map("created_at")
+  members   VTC_Affiliation[]
+
+  @@map("vtcs")
+}
+
+model VTC_Affiliation {
+  id       String   @id @default(uuid())
+  userId   String   @map("user_id")
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vtcId    String   @map("vtc_id")
+  vtc      VTC      @relation(fields: [vtcId], references: [id], onDelete: Cascade)
+  role     VtcRole  @default(MEMBER)
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  @@unique([userId, vtcId])
+  @@map("vtc_affiliations")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique @map("token_hash")
+  revoked   Boolean  @default(false)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?  @map("actor_id")
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id")
+  details    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Announcement {
+  id        String   @id @default(uuid())
+  title     String
+  body      String
+  authorId  String   @map("author_id")
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  published Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([published, createdAt])
+  @@map("announcements")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String?
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+model Friendship {
+  id          String       @id @default(uuid())
+  requesterId String       @map("requester_id")
+  requester   User         @relation("FriendRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addresseeId String       @map("addressee_id")
+  addressee   User         @relation("FriendAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+  status      FriendStatus @default(PENDING)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, status])
+  @@map("friendships")
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  senderId   String   @map("sender_id")
+  sender     User     @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String   @map("receiver_id")
+  receiver   User     @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  body       String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([senderId, receiverId, createdAt])
+  @@index([receiverId, read])
+  @@map("messages")
+}
+
+model Event {
+  id           String            @id @default(uuid())
+  title        String
+  description  String
+  type         EventType         @default(CONVOY)
+  status       EventStatus       @default(UPCOMING)
+  startAt      DateTime          @map("start_at")
+  endAt        DateTime?         @map("end_at")
+  location     String?
+  game         Game?
+  serverId     String?           @map("server_id")
+  server       Server?           @relation(fields: [serverId], references: [id], onDelete: SetNull)
+  organizerId  String?           @map("organizer_id")
+  organizer    User?             @relation(fields: [organizerId], references: [id], onDelete: SetNull)
+  published    Boolean           @default(true)
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+  participants EventParticipant[]
+
+  @@index([startAt])
+  @@map("events")
+}
+
+model EventParticipant {
+  id        String   @id @default(uuid())
+  eventId   String   @map("event_id")
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([eventId, userId])
+  @@map("event_participants")
+}
+model ApiKey {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  name       String
+  prefix     String
+  keyHash    String    @unique @map("key_hash")
+  scopes     String[]  @default([])
+  lastUsedAt DateTime? @map("last_used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  revokedAt  DateTime? @map("revoked_at")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("api_keys")
+}
+
+model Webhook {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  url         String
+  secret      String
+  events      String[]  @default([])
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  lastFiredAt DateTime? @map("last_fired_at")
+  lastStatus  Int?      @map("last_status")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("webhooks")
+}

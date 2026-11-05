@@ -1,0 +1,10 @@
+{
+  "name": "@freightmp/client-mod-launcher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lance ETS2/ATS et injecte la DLL client FreightMP",
+  "bin": { "fmp-launch": "index.js" },
+  "scripts": {
+    "launch": "node index.js"
+  }
+}

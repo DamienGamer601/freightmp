@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Prisma / SQLite
+*.db
+*.db-journal
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Misc
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Vercel
+.vercel
+
+# Artefacts MSVC (client-mod)
+*.obj
+*.exp
+*.lib
+*.pdb
+*.ilk
+
+# Archives de mise à jour générées
+update-*.zip

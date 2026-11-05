@@ -1,0 +1,25 @@
+{
+  "name": "@freightmp/mp-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Serveur multijoueur FreightMP (UDP + lobby HTTP + tick)",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "client": "tsx src/client.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.12"
+  }
+}

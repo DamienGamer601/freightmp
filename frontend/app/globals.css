@@ -1,0 +1,232 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --accent: 226 58 58;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-charbon-950 text-zinc-300 antialiased;
+  background-image: radial-gradient(
+    ellipse 80% 50% at 50% -10%,
+    rgba(226, 58, 58, 0.1),
+    transparent 60%
+  );
+  background-attachment: fixed;
+}
+
+/* ---------- Scrollbar ---------- */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #06070a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2c323f;
+  border-radius: 9999px;
+  border: 2px solid #06070a;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #e23a3a;
+}
+
+/* ---------- Utilitaires 2026 ---------- */
+
+@layer components {
+  .glass {
+    @apply border border-white/[0.07] bg-white/[0.03] backdrop-blur-xl;
+  }
+
+  .glass-strong {
+    @apply border border-white/10 bg-white/[0.055] backdrop-blur-2xl;
+  }
+
+  .card {
+    @apply glass rounded-2xl transition-all duration-300;
+  }
+
+  .card-hover {
+    @apply hover:-translate-y-1 hover:border-white/15 hover:bg-white/[0.05] hover:shadow-glow-sm;
+  }
+
+  .gradient-text {
+    background: linear-gradient(120deg, #ffffff 10%, #ff9a9a 45%, #e23a3a 90%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .pill {
+    @apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-all duration-200;
+  }
+
+  .btn-primary {
+    @apply btn bg-gradient-to-br from-rouge-400 to-rouge-600 text-white shadow-glow-sm hover:brightness-110 hover:-translate-y-0.5 active:translate-y-0;
+  }
+
+  .btn-ghost {
+    @apply btn border border-white/10 bg-white/[0.04] text-zinc-200 hover:border-white/20 hover:bg-white/[0.07];
+  }
+
+  .btn-sm {
+    @apply px-3.5 py-2 text-xs;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-zinc-600 focus:border-rouge-500/60 focus:bg-white/[0.06];
+  }
+
+  .divider {
+    @apply h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent;
+  }
+
+  .section-title {
+    @apply font-display text-3xl font-bold tracking-tight text-white sm:text-4xl;
+  }
+
+  .section-eyebrow {
+    @apply text-xs font-bold uppercase tracking-[0.24em] text-rouge-400;
+  }
+
+  .bento {
+    @apply grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3;
+  }
+}
+
+/* ---------- Halo du hero ---------- */
+
+.hero-glow {
+  background:
+    radial-gradient(
+      ellipse 60% 45% at 50% 0%,
+      rgba(226, 58, 58, 0.18),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 40% 40% at 85% 15%,
+      rgba(99, 102, 241, 0.1),
+      transparent 70%
+    );
+}
+
+/* ---------- Grille ---------- */
+
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+.bg-grid-mask {
+  mask-image: radial-gradient(
+    ellipse 80% 60% at 50% 0%,
+    #000 40%,
+    transparent 100%
+  );
+  -webkit-mask-image: radial-gradient(
+    ellipse 80% 60% at 50% 0%,
+    #000 40%,
+    transparent 100%
+  );
+}
+
+/* ---------- Aurora animée ---------- */
+
+.bg-aurora {
+  background: linear-gradient(
+    120deg,
+    rgba(226, 58, 58, 0.12),
+    rgba(99, 102, 241, 0.08),
+    rgba(226, 58, 58, 0.06),
+    rgba(226, 58, 58, 0.12)
+  );
+  background-size: 300% 300%;
+  animation: gradient-shift 10s ease infinite;
+}
+
+/* ---------- Effet de bordure dégradée ---------- */
+
+.border-gradient {
+  position: relative;
+}
+.border-gradient::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(226, 58, 58, 0.55),
+    rgba(255, 255, 255, 0.12),
+    transparent 60%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ---------- Reveal au scroll ---------- */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* ---------- Texte shimmer ---------- */
+
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    #ffffff 0%,
+    #ff9a9a 25%,
+    #ffffff 50%,
+    #ff9a9a 75%,
+    #ffffff 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 4s linear infinite;
+}
