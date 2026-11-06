@@ -8,29 +8,83 @@ import { AppError, asyncHandler } from "../middleware/error";
 const router = Router();
 
 const createVtcSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(2).max(60),
   tag: z
     .string()
     .min(1)
     .max(8)
     .transform((tag) => tag.toUpperCase()),
+  description: z.string().max(2000).optional().nullable(),
+  logoUrl: z.string().max(500).optional().nullable(),
+  bannerUrl: z.string().max(500).optional().nullable(),
+  region: z.string().max(40).optional().nullable(),
+  language: z.string().max(10).optional().nullable(),
+  website: z.string().max(200).optional().nullable(),
+  discordUrl: z.string().max(200).optional().nullable(),
+  recruiting: z.boolean().optional(),
 });
+
+/** Champs renvoyés pour une VTC (liste + détail). */
+function toVtcDto(vtc: {
+  id: string;
+  name: string;
+  tag: string;
+  description: string | null;
+  logoUrl: string | null;
+  bannerUrl: string | null;
+  region: string | null;
+  language: string | null;
+  website: string | null;
+  discordUrl: string | null;
+  recruiting: boolean;
+  ownerId: string;
+  createdAt: Date;
+}) {
+  return {
+    id: vtc.id,
+    name: vtc.name,
+    tag: vtc.tag,
+    description: vtc.description,
+    logoUrl: vtc.logoUrl,
+    bannerUrl: vtc.bannerUrl,
+    region: vtc.region,
+    language: vtc.language,
+    website: vtc.website,
+    discordUrl: vtc.discordUrl,
+    recruiting: vtc.recruiting,
+    ownerId: vtc.ownerId,
+    createdAt: vtc.createdAt,
+  };
+}
 
 router.post(
   "/",
   requireAuth,
   asyncHandler(async (req, res) => {
-    const { name, tag } = createVtcSchema.parse(req.body);
+    const data = createVtcSchema.parse(req.body);
 
-    const existing = await prisma.vTC.findUnique({ where: { tag } });
+    const existing = await prisma.vTC.findUnique({ where: { tag: data.tag } });
     if (existing) {
-      throw new AppError(409, "TAG_TAKEN", "VTC tag already in use");
+      throw new AppError(409, "TAG_TAKEN", "Ce tag est déjà utilisé");
+    }
+
+    const ownedCount = await prisma.vTC.count({ where: { ownerId: req.user!.id } });
+    if (ownedCount > 0) {
+      throw new AppError(409, "ALREADY_OWNER", "Vous possédez déjà une VTC");
     }
 
     const vtc = await prisma.vTC.create({
       data: {
-        name,
-        tag,
+        name: data.name,
+        tag: data.tag,
+        description: data.description ?? null,
+        logoUrl: data.logoUrl ?? null,
+        bannerUrl: data.bannerUrl ?? null,
+        region: data.region ?? null,
+        language: data.language ?? null,
+        website: data.website ?? null,
+        discordUrl: data.discordUrl ?? null,
+        recruiting: data.recruiting ?? true,
         ownerId: req.user!.id,
         members: {
           create: { userId: req.user!.id, role: "OWNER" },
@@ -40,13 +94,7 @@ router.post(
     });
 
     res.json({
-      vtc: {
-        id: vtc.id,
-        name: vtc.name,
-        tag: vtc.tag,
-        ownerId: vtc.ownerId,
-        createdAt: vtc.createdAt,
-      },
+      vtc: toVtcDto(vtc),
       affiliation: vtc.members[0],
     });
   }),
@@ -65,13 +113,9 @@ router.get(
 
     res.json(
       vtcs.map((vtc) => ({
-        id: vtc.id,
-        name: vtc.name,
-        tag: vtc.tag,
-        ownerId: vtc.ownerId,
+        ...toVtcDto(vtc),
         ownerUsername: vtc.owner.username,
         memberCount: vtc._count.members,
-        createdAt: vtc.createdAt,
       })),
     );
   }),
@@ -85,7 +129,7 @@ router.get(
       include: {
         owner: { select: { username: true } },
         members: {
-          include: { user: { select: { username: true } } },
+          include: { user: { select: { username: true, avatarUrl: true } } },
           orderBy: { joinedAt: "asc" },
         },
       },
@@ -96,15 +140,12 @@ router.get(
     }
 
     res.json({
-      id: vtc.id,
-      name: vtc.name,
-      tag: vtc.tag,
-      ownerId: vtc.ownerId,
+      ...toVtcDto(vtc),
       ownerUsername: vtc.owner.username,
-      createdAt: vtc.createdAt,
       members: vtc.members.map((member) => ({
         userId: member.userId,
         username: member.user.username,
+        avatarUrl: member.user.avatarUrl,
         role: member.role,
         joinedAt: member.joinedAt,
       })),
@@ -282,6 +323,39 @@ router.delete(
     });
 
     res.json({ success: true });
+  }),
+);
+
+const updateVtcSchema = z.object({
+  description: z.string().max(2000).optional().nullable(),
+  logoUrl: z.string().max(500).optional().nullable(),
+  bannerUrl: z.string().max(500).optional().nullable(),
+  region: z.string().max(40).optional().nullable(),
+  language: z.string().max(10).optional().nullable(),
+  website: z.string().max(200).optional().nullable(),
+  discordUrl: z.string().max(200).optional().nullable(),
+  recruiting: z.boolean().optional(),
+});
+
+router.patch(
+  "/:id",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const vtc = await prisma.vTC.findUnique({ where: { id: req.params.id } });
+    if (!vtc) {
+      throw new AppError(404, "NOT_FOUND", "VTC not found");
+    }
+    if (vtc.ownerId !== req.user!.id) {
+      throw new AppError(403, "FORBIDDEN", "Seul le propriétaire peut modifier la VTC");
+    }
+
+    const data = updateVtcSchema.parse(req.body);
+    const updated = await prisma.vTC.update({
+      where: { id: vtc.id },
+      data,
+    });
+
+    res.json({ vtc: toVtcDto(updated) });
   }),
 );
 

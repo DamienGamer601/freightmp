@@ -147,60 +147,114 @@ export default function VtcDetailPage() {
         </Link>
 
         {/* En-tête */}
-        <div className="card p-6 backdrop-blur">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-3">
-                <h1 className="truncate text-2xl font-bold text-white">{vtc.name}</h1>
-                <span className="rounded-md bg-carbone-600 px-2 py-1 text-xs font-bold text-zinc-200">
-                  {vtc.tag}
-                </span>
-              </div>
-              <p className="mt-2 text-sm text-zinc-400">
-                Propriétaire :{" "}
-                <span className="font-medium text-white">{vtc.ownerUsername}</span> ·
-                créée le {formatDate(vtc.createdAt)}
-              </p>
-              <p className="mt-1 text-sm text-zinc-400">
-                {vtc.members.length} membre{vtc.members.length > 1 ? "s" : ""}
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {isOwner ? (
-                <span className="rounded-lg border border-rouge-500/30 bg-rouge-500/10 px-3 py-2 text-xs font-semibold text-rouge-300">
-                  Propriétaire
-                </span>
-              ) : isMember ? (
-                <button
-                  type="button"
-                  onClick={() => void leave()}
-                  disabled={busy}
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-zinc-300 hover:bg-white/10 disabled:opacity-50"
-                >
-                  Quitter
-                </button>
-              ) : user ? (
-                <button
-                  type="button"
-                  onClick={() => void join()}
-                  disabled={busy}
-                  className="rounded-lg bg-rouge-500 px-3 py-2 text-sm font-semibold text-white hover:bg-rouge-400 disabled:opacity-50"
-                >
-                  Rejoindre
-                </button>
-              ) : (
-                <Link
-                  href="/"
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-zinc-400 hover:bg-white/10"
-                >
-                  Rejoindre
-                </Link>
-              )}
-            </div>
+        <div className="card overflow-hidden p-0 backdrop-blur">
+          {/* Bannière */}
+          <div className="relative h-32 bg-gradient-to-r from-rouge-600/40 via-charbon-800 to-charbon-900">
+            {vtc.bannerUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={vtc.bannerUrl} alt="" className="h-full w-full object-cover opacity-70" />
+            )}
           </div>
 
-          {error && <p className="mt-3 text-sm text-rouge-400">{error}</p>}
+          <div className="p-6">
+            <div className="-mt-16 flex flex-wrap items-end justify-between gap-4">
+              <div className="flex items-end gap-4">
+                <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-charbon-900 text-xl font-bold text-white shadow-xl">
+                  {vtc.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={vtc.logoUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    vtc.name.slice(0, 2).toUpperCase()
+                  )}
+                </div>
+                <div className="min-w-0 pb-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="truncate text-2xl font-bold text-white">{vtc.name}</h1>
+                    <span className="rounded-md bg-carbone-600 px-2 py-1 text-xs font-bold text-zinc-200">
+                      {vtc.tag}
+                    </span>
+                    <span className={`badge ${vtc.recruiting ? "badge-ok" : ""}`}>
+                      {vtc.recruiting ? "Recrute" : "Complet"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-zinc-400">
+                    Propriétaire :{" "}
+                    <span className="font-medium text-white">{vtc.ownerUsername}</span>
+                    {vtc.region ? ` · ${vtc.region}` : ""}
+                    {vtc.language ? ` · ${vtc.language}` : ""}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {isOwner ? (
+                  <span className="rounded-lg border border-rouge-500/30 bg-rouge-500/10 px-3 py-2 text-xs font-semibold text-rouge-300">
+                    Propriétaire
+                  </span>
+                ) : isMember ? (
+                  <button
+                    type="button"
+                    onClick={() => void leave()}
+                    disabled={busy}
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-zinc-300 hover:bg-white/10 disabled:opacity-50"
+                  >
+                    Quitter
+                  </button>
+                ) : user ? (
+                  <button
+                    type="button"
+                    onClick={() => void join()}
+                    disabled={busy}
+                    className="rounded-lg bg-rouge-500 px-3 py-2 text-sm font-semibold text-white hover:bg-rouge-400 disabled:opacity-50"
+                  >
+                    Rejoindre
+                  </button>
+                ) : (
+                  <Link
+                    href="/"
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-zinc-400 hover:bg-white/10"
+                  >
+                    Rejoindre
+                  </Link>
+                )}
+              </div>
+            </div>
+
+            {vtc.description && (
+              <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-zinc-300">
+                {vtc.description}
+              </p>
+            )}
+
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-zinc-400">
+              <span>
+                {vtc.members.length} membre{vtc.members.length > 1 ? "s" : ""}
+              </span>
+              <span>Créée le {formatDate(vtc.createdAt)}</span>
+              {vtc.website && (
+                <a
+                  href={vtc.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-rouge-300 hover:text-rouge-200"
+                >
+                  Site web ↗
+                </a>
+              )}
+              {vtc.discordUrl && (
+                <a
+                  href={vtc.discordUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-300 hover:text-indigo-200"
+                >
+                  Discord ↗
+                </a>
+              )}
+            </div>
+
+            {error && <p className="mt-3 text-sm text-rouge-400">{error}</p>}
+          </div>
         </div>
 
         {/* Membres */}

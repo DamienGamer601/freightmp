@@ -531,6 +531,78 @@ function ProfileContent({
           </div>
         </div>
 
+        {/* ---- Complétude du profil ---- */}
+        <div className="card p-6 backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold text-white">Complétude du profil</h2>
+            <span className={`text-sm font-bold ${accent.text}`}>
+              {Math.round(
+                ([
+                  Boolean(user.avatarUrl),
+                  Boolean(user.bannerUrl),
+                  Boolean(user.bio),
+                  Boolean(user.country),
+                  Boolean(user.title),
+                  Boolean(user.steamId),
+                  Boolean(user.discordId),
+                ].filter(Boolean).length /
+                  7) *
+                  100,
+              )}
+              %
+            </span>
+          </div>
+          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-carbone-600">
+            <div
+              className={`h-full rounded-full transition-all ${accent.bar}`}
+              style={{
+                width: `${
+                  ([
+                    Boolean(user.avatarUrl),
+                    Boolean(user.bannerUrl),
+                    Boolean(user.bio),
+                    Boolean(user.country),
+                    Boolean(user.title),
+                    Boolean(user.steamId),
+                    Boolean(user.discordId),
+                  ].filter(Boolean).length /
+                    7) *
+                  100
+                }%`,
+              }}
+            />
+          </div>
+          <ul className="mt-4 grid gap-1.5 sm:grid-cols-2">
+            {[
+              { label: "Photo de profil", done: Boolean(user.avatarUrl) },
+              { label: "Bannière", done: Boolean(user.bannerUrl) },
+              { label: "Biographie", done: Boolean(user.bio) },
+              { label: "Pays", done: Boolean(user.country) },
+              { label: "Titre", done: Boolean(user.title) },
+              { label: "Steam lié", done: Boolean(user.steamId) },
+              { label: "Discord lié", done: Boolean(user.discordId) },
+            ].map((item) => (
+              <li key={item.label} className="flex items-center gap-2 text-sm">
+                <span
+                  className={
+                    item.done
+                      ? "flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] text-emerald-300"
+                      : "flex h-4 w-4 items-center justify-center rounded-full bg-white/5 text-[10px] text-zinc-600"
+                  }
+                >
+                  {item.done ? "✓" : "·"}
+                </span>
+                <span className={item.done ? "text-zinc-300" : "text-zinc-500"}>
+                  {item.label}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <button type="button" onClick={() => setEditing(true)} className="btn-ghost btn-sm mt-4">
+            Compléter mon profil
+          </button>
+        </div>
+
         {/* ---- Stats ---- */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <StatCard label="Kilomètres" value={formatKm(user.stats.kilometersDriven)} icon={<RouteIcon className="h-5 w-5" />} />

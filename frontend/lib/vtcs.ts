@@ -6,31 +6,52 @@ import { getApiUrl } from "./api";
 
 export type VtcMemberRole = "OWNER" | "MANAGER" | "MEMBER";
 
-export interface VtcSummary {
+/** Champs communs à toutes les représentations d'une VTC. */
+export interface VtcBase {
   id: string;
   name: string;
   tag: string;
+  description: string | null;
+  logoUrl: string | null;
+  bannerUrl: string | null;
+  region: string | null;
+  language: string | null;
+  website: string | null;
+  discordUrl: string | null;
+  recruiting: boolean;
   ownerId: string;
+  createdAt: string;
+}
+
+export interface VtcSummary extends VtcBase {
   ownerUsername: string;
   memberCount: number;
-  createdAt: string;
 }
 
 export interface VtcMember {
   userId: string;
   username: string;
+  avatarUrl?: string | null;
   role: VtcMemberRole;
   joinedAt: string;
 }
 
-export interface VtcDetail {
-  id: string;
+export interface VtcDetail extends VtcBase {
+  ownerUsername: string;
+  members: VtcMember[];
+}
+
+export interface CreateVtcInput {
   name: string;
   tag: string;
-  ownerId: string;
-  ownerUsername: string;
-  createdAt: string;
-  members: VtcMember[];
+  description?: string | null;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+  region?: string | null;
+  language?: string | null;
+  website?: string | null;
+  discordUrl?: string | null;
+  recruiting?: boolean;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -58,10 +79,9 @@ export function fetchVtcDetail(id: string): Promise<VtcDetail> {
   return request<VtcDetail>(`/api/v1/vtcs/${id}`);
 }
 
-export function createVtc(input: {
-  name: string;
-  tag: string;
-}): Promise<{ vtc: { id: string; name: string; tag: string }; affiliation: unknown }> {
+export function createVtc(
+  input: CreateVtcInput,
+): Promise<{ vtc: VtcBase; affiliation: unknown }> {
   return request("/api/v1/vtcs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -79,8 +99,8 @@ export function leaveVtc(id: string): Promise<unknown> {
 
 export function updateVtc(
   id: string,
-  input: { name: string },
-): Promise<{ id: string; name: string; tag: string }> {
+  input: Partial<CreateVtcInput>,
+): Promise<{ vtc: VtcBase }> {
   return request(`/api/v1/vtcs/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

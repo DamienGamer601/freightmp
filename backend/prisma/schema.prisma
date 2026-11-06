@@ -150,13 +150,22 @@ model Ban {
 }
 
 model VTC {
-  id        String            @id @default(uuid())
-  name      String
-  tag       String            @unique
-  ownerId   String            @map("owner_id")
-  owner     User              @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  createdAt DateTime          @default(now()) @map("created_at")
-  members   VTC_Affiliation[]
+  id          String            @id @default(uuid())
+  name        String
+  tag         String            @unique
+  description String?
+  logoUrl     String?           @map("logo_url")
+  bannerUrl   String?           @map("banner_url")
+  region      String?
+  language    String?
+  website     String?
+  discordUrl  String?           @map("discord_url")
+  recruiting  Boolean           @default(true)
+  ownerId     String            @map("owner_id")
+  owner       User              @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @default(now()) @map("updated_at")
+  members     VTC_Affiliation[]
 
   @@map("vtcs")
 }

@@ -18,7 +18,13 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "FreightMP — ETS2 & ATS Multiplayer Hub",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://freightmp.vercel.app",
+  ),
+  title: {
+    default: "FreightMP — ETS2 & ATS Multiplayer Hub",
+    template: "%s · FreightMP",
+  },
   description:
     "FreightMP (FMP) — la plateforme multijoueur alternative pour Euro Truck Simulator 2 et American Truck Simulator, propulsée par FR | Industries Corporation.",
   icons: {
@@ -26,6 +32,16 @@ export const metadata: Metadata = {
     apple: "/freightmp-logo.png",
   },
   openGraph: {
+    type: "website",
+    locale: "fr_FR",
+    siteName: "FreightMP",
+    title: "FreightMP — ETS2 & ATS Multiplayer Hub",
+    description:
+      "La plateforme multijoueur alternative pour Euro Truck Simulator 2 et American Truck Simulator.",
+    images: [{ url: "/freightmp-banner.png", width: 1920, height: 1080, alt: "FreightMP" }],
+  },
+  twitter: {
+    card: "summary_large_image",
     title: "FreightMP — ETS2 & ATS Multiplayer Hub",
     description:
       "La plateforme multijoueur alternative pour Euro Truck Simulator 2 et American Truck Simulator.",

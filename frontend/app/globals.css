@@ -92,6 +92,22 @@ body {
     @apply w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-zinc-600 focus:border-rouge-500/60 focus:bg-white/[0.06];
   }
 
+  .field {
+    @apply flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-500;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-0.5 text-[11px] font-semibold text-zinc-400;
+  }
+
+  .badge-ok {
+    @apply border-emerald-500/30 bg-emerald-500/10 text-emerald-300;
+  }
+
+  .badge-warn {
+    @apply border-amber-500/30 bg-amber-500/10 text-amber-300;
+  }
+
   .divider {
     @apply h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent;
   }

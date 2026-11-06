@@ -25,6 +25,19 @@ function formatDateTime(value: string): string {
   });
 }
 
+/** Compte à rebours lisible (ex. « dans 3 j 4 h »). */
+function countdown(value: string): string {
+  const diff = new Date(value).getTime() - Date.now();
+  if (Number.isNaN(diff)) return "";
+  if (diff <= 0) return "imminent";
+  const days = Math.floor(diff / 86_400_000);
+  const hours = Math.floor((diff % 86_400_000) / 3_600_000);
+  const minutes = Math.floor((diff % 3_600_000) / 60_000);
+  if (days > 0) return `dans ${days} j ${hours} h`;
+  if (hours > 0) return `dans ${hours} h ${minutes} min`;
+  return `dans ${minutes} min`;
+}
+
 export default function EventsPage() {
   const { user } = useAuth();
   const [events, setEvents] = useState<GameEvent[]>([]);
@@ -32,7 +45,7 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
+  const [tab, setTab] = useState<"upcoming" | "mine" | "past">("upcoming");
 
   const load = useCallback(() => {
     setLoading(true);
@@ -89,7 +102,9 @@ export default function EventsPage() {
   const past = events
     .filter((event) => new Date(event.startAt).getTime() < now)
     .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
-  const visible = tab === "upcoming" ? upcoming : past;
+  const mine = upcoming.filter((event) => joinedIds.has(event.id));
+  const visible = tab === "upcoming" ? upcoming : tab === "mine" ? mine : past;
+  const nextEvent = upcoming[0] ?? null;
 
   return (
     <section className="relative overflow-hidden px-4 py-12 sm:px-6 lg:px-8">
@@ -111,8 +126,9 @@ export default function EventsPage() {
           {(
             [
               { id: "upcoming", label: `À venir (${upcoming.length})` },
+              ...(user ? [{ id: "mine" as const, label: `Mes événements (${mine.length})` }] : []),
               { id: "past", label: `Passés (${past.length})` },
-            ] as { id: "upcoming" | "past"; label: string }[]
+            ] as { id: "upcoming" | "mine" | "past"; label: string }[]
           ).map((item) => (
             <button
               key={item.id}
@@ -129,6 +145,24 @@ export default function EventsPage() {
           ))}
         </div>
 
+        {/* Prochain événement */}
+        {nextEvent && (
+          <div className="card flex flex-wrap items-center justify-between gap-3 border-rouge-500/20 bg-gradient-to-r from-rouge-600/10 to-transparent p-4">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🗓️</span>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-rouge-400">Prochain événement</p>
+                <p className="font-semibold text-white">{nextEvent.title}</p>
+                <p className="text-xs text-zinc-500">
+                  {formatDateTime(nextEvent.startAt)}
+                  {nextEvent.location ? ` · ${nextEvent.location}` : ""}
+                </p>
+              </div>
+            </div>
+            <span className="badge badge-ok">{countdown(nextEvent.startAt)}</span>
+          </div>
+        )}
+
         {error && <p className="text-sm text-rouge-400">{error}</p>}
 
         {loading ? (
@@ -143,7 +177,9 @@ export default function EventsPage() {
             <p className="mt-3 text-sm text-zinc-400">
               {tab === "upcoming"
                 ? "Aucun événement à venir pour le moment."
-                : "Aucun événement passé."}
+                : tab === "mine"
+                  ? "Vous n'êtes inscrit à aucun événement à venir."
+                  : "Aucun événement passé."}
             </p>
           </div>
         ) : (
