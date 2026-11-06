@@ -8,7 +8,8 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "client": "tsx src/client.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:admin": "node test/admin-panel.mjs"
   },
   "dependencies": {
     "jsonwebtoken": "^9.0.2",
