@@ -27,14 +27,18 @@ quitter le jeu**.
 
 | # | Action | Effet |
 |---|---|---|
-| 0 | Expulser le joueur sélectionné | Envoie `kick` au serveur (refusé si la cible est `ADMIN` et l'auteur `MODERATOR`) |
-| 1 | Météo : clair | `set-environment { weather: "clear" }` |
-| 2 | Météo : pluie | `set-environment { weather: "rain" }` |
-| 3 | Météo : brouillard | `set-environment { weather: "fog" }` |
-| 4 | Météo : neige | `set-environment { weather: "snow" }` |
-| 5 | Heure +1 h | `time { delta: 60 }` |
-| 6 | Heure -1 h | `time { delta: -60 }` |
-| 7 | Annonce | Ouvre la saisie du chat en mode annonce (diffusion à toute la salle) |
+| 0 | Expulser le joueur sélectionné | Envoie `kick` (refusé si la cible est `ADMIN` et l'auteur `MODERATOR`) |
+| 1 | **Bannir le joueur sélectionné** | Envoie `ban` → ban permanent en base + expulsion immédiate |
+| 2 | Météo : clair | `set-environment { weather: "clear" }` |
+| 3 | Météo : pluie | `set-environment { weather: "rain" }` |
+| 4 | Météo : brouillard | `set-environment { weather: "fog" }` |
+| 5 | Météo : neige | `set-environment { weather: "snow" }` |
+| 6 | Heure +1 h | `time { delta: 60 }` |
+| 7 | Heure -1 h | `time { delta: -60 }` |
+| 8 | Annonce | Ouvre la saisie du chat en mode annonce (diffusion à toute la salle) |
+
+> Le **ban** exige que la cible soit authentifiée (jeton MP → `userId` connu)
+> et que le serveur MP puisse joindre l'API FreightMP.
 
 ## Protocole (UDP, JSON)
 
@@ -42,6 +46,7 @@ quitter le jeu**.
 
 ```jsonc
 { "t": "kick",     "target": 42 }              // numId du joueur
+{ "t": "ban",      "target": 42, "reason": "…" }
 { "t": "announce", "message": "Convoi dans 5 min" }
 { "t": "time",     "delta": 60 }               // minutes
 { "t": "set-environment", "weather": "rain", "timeOfDay": 720 }
@@ -87,9 +92,11 @@ npm run build && npm test # → 12/12 tests
 
 ## Limites connues
 
-- Le panneau **ne permet pas encore** de bannir (le ban est géré côté web et
-  stocké en base — un ban MP nécessiterait de vérifier la table au join).
-- La téléportation n'est pas disponible (dépend de la couche entités, dont le
+- **Pas de téléportation** (dépend de la couche entités, dont le
   reverse-engineering n'est pas terminé).
+- Un ban ne peut viser qu'un joueur **authentifié** (jeton MP). Les joueurs
+  anonymes ne peuvent être qu'expulsés.
 - L'expulsion retire le joueur de la salle ; son client reçoit `kicked` mais ne
   se déconnecte pas automatiquement de l'UI.
+- Si l'API FreightMP est injoignable, le serveur MP **refuse** le ban (aucun ban
+  fantôme) et renvoie une erreur à l'admin.
