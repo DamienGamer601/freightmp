@@ -12,6 +12,7 @@
     "test:admin": "node test/admin-panel.mjs"
   },
   "dependencies": {
+    "dotenv": "^18.0.9",
     "jsonwebtoken": "^9.0.2",
     "ws": "^8.18.0"
   },

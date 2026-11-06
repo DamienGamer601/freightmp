@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { GameServer } from "./game-server";
 
 const udpPort = Number(process.env.MP_UDP_PORT ?? "5000");

@@ -196,4 +196,83 @@ router.post(
   }),
 );
 
+/* ---------- Données de démonstration ---------- */
+
+const DEMO_DRIVERS = [
+  { username: "Lucas_Martin", country: "FR", km: 48250, deliveries: 96, hours: 142 },
+  { username: "Sophie_Duval", country: "FR", km: 39120, deliveries: 78, hours: 118 },
+  { username: "Max_Trucker", country: "BE", km: 31480, deliveries: 61, hours: 95 },
+  { username: "Nils_Autobahn", country: "DE", km: 27890, deliveries: 54, hours: 88 },
+  { username: "Emma_Roads", country: "CA", km: 22340, deliveries: 47, hours: 71 },
+  { username: "Tom_Longhaul", country: "GB", km: 19870, deliveries: 39, hours: 63 },
+];
+
+const CARGO = [
+  "Acier laminé",
+  "Produits frais",
+  "Électronique",
+  "Bois de construction",
+  "Carburant",
+  "Machines agricoles",
+];
+
+const ROUTES = [
+  ["Paris", "Lyon"],
+  ["Marseille", "Bordeaux"],
+  ["Lille", "Strasbourg"],
+  ["Toulouse", "Nantes"],
+  ["Bruxelles", "Amsterdam"],
+  ["Berlin", "Munich"],
+];
+
+/** POST /api/v1/internal/seed-demo — crée des joueurs/livraisons de démo. */
+router.post(
+  "/seed-demo",
+  asyncHandler(async (_req, res) => {
+    let created = 0;
+    for (const driver of DEMO_DRIVERS) {
+      const existing = await prisma.user.findUnique({
+        where: { username: driver.username },
+      });
+      if (existing) {
+        continue;
+      }
+
+      const user = await prisma.user.create({
+        data: {
+          username: driver.username,
+          country: driver.country,
+          role: "DRIVER",
+          kilometersDriven: driver.km,
+          deliveriesCompleted: driver.deliveries,
+          totalPlayTimeSeconds: driver.hours * 3600,
+          bio: `Chauffeur ${driver.country} · ${driver.deliveries} livraisons au compteur.`,
+        },
+      });
+      created += 1;
+
+      const count = Math.min(6, driver.deliveries);
+      for (let index = 0; index < count; index += 1) {
+        const [fromCity, toCity] = ROUTES[index % ROUTES.length];
+        const distance = 400 + ((index * 137 + driver.km) % 900);
+        const completedAt = new Date(Date.now() - (index + 1) * 86_400_000);
+        await prisma.delivery.create({
+          data: {
+            userId: user.id,
+            cargoName: CARGO[index % CARGO.length],
+            fromCity,
+            toCity,
+            distanceKm: distance,
+            income: Math.round(distance * 2.4),
+            startedAt: new Date(completedAt.getTime() - 3 * 3_600_000),
+            completedAt,
+          },
+        });
+      }
+    }
+
+    res.json({ ok: true, usersCreated: created });
+  }),
+);
+
 export default router;
