@@ -90,11 +90,9 @@ export default function MultiplayerPage() {
       <div className="relative mx-auto max-w-5xl space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-widest text-rouge-400">
-              Multijoueur
-            </p>
-            <h1 className="mt-2 text-3xl font-bold text-white">Salles de jeu</h1>
-            <p className="mt-2 max-w-xl text-sm text-zinc-400">
+            <p className="section-eyebrow">Multijoueur</p>
+            <h1 className="section-title mt-3">Salles de jeu</h1>
+            <p className="mt-3 max-w-xl text-sm text-zinc-400">
               Serveur de jeu temps réel (UDP, 20 Hz). Les joueurs connectés via le
               client FreightMP apparaissent ici en direct.
             </p>
@@ -142,6 +140,38 @@ export default function MultiplayerPage() {
         </div>
 
         <MpLiveMap wsUrl={getMpWsUrl()} />
+
+        {/* Comment rejoindre */}
+        <div className="card p-6 backdrop-blur">
+          <h2 className="text-lg font-semibold text-white">Comment rejoindre une partie</h2>
+          <ol className="mt-4 grid gap-3 sm:grid-cols-3">
+            {[
+              {
+                step: 1,
+                title: "Génère ton jeton",
+                text: "Clique sur « Générer mon jeton » ci-dessous et copie la valeur.",
+              },
+              {
+                step: 2,
+                title: "Lance le client",
+                text: "Dans le dossier client : $env:MP_TOKEN=\"…\" ; npm run client",
+              },
+              {
+                step: 3,
+                title: "Roule à plusieurs",
+                text: "Les autres joueurs de la salle apparaissent en direct sur la carte.",
+              },
+            ].map((item) => (
+              <li key={item.step} className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-rouge-500 text-xs font-bold text-white">
+                  {item.step}
+                </span>
+                <p className="mt-2 text-sm font-semibold text-white">{item.title}</p>
+                <p className="mt-1 text-xs leading-relaxed text-zinc-400">{item.text}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
 
         {user && (
           <div className="card p-6 backdrop-blur">

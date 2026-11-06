@@ -1,25 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchConversations, type Conversation } from "@/lib/messages";
 
-function formatDate(value: string): string {
+/** « il y a 5 min », « hier », « 12 mars ». */
+function relativeDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("fr-FR", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const diff = Date.now() - date.getTime();
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return "à l'instant";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "hier";
+  if (days < 7) return `${days} j`;
+  return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
 }
 
 export default function MessagesPage() {
   const { user, loading: authLoading } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     if (authLoading) return;
@@ -43,6 +49,21 @@ export default function MessagesPage() {
     };
   }, [user, authLoading]);
 
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return conversations;
+    return conversations.filter(
+      (conversation) =>
+        conversation.user.username.toLowerCase().includes(q) ||
+        conversation.lastMessage.body.toLowerCase().includes(q),
+    );
+  }, [conversations, query]);
+
+  const totalUnread = useMemo(
+    () => conversations.reduce((sum, conversation) => sum + conversation.unread, 0),
+    [conversations],
+  );
+
   if (!authLoading && !user) {
     return (
       <section className="relative flex min-h-[70vh] items-center justify-center px-4 py-20">
@@ -53,10 +74,7 @@ export default function MessagesPage() {
           <p className="mt-2 text-sm text-zinc-400">
             Connectez-vous pour accéder à votre messagerie.
           </p>
-          <Link
-            href="/"
-            className="mt-6 inline-flex items-center justify-center rounded-xl bg-rouge-500 px-6 py-3 text-sm font-semibold text-white hover:bg-rouge-400"
-          >
+          <Link href="/" className="btn-primary mt-6 inline-flex">
             Retour à l&apos;accueil
           </Link>
         </div>
@@ -68,15 +86,26 @@ export default function MessagesPage() {
     <section className="relative overflow-hidden px-4 py-12 sm:px-6 lg:px-8">
       <div className="pointer-events-none absolute inset-0 hero-glow" aria-hidden="true" />
       <div className="relative mx-auto max-w-3xl space-y-6">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-widest text-rouge-400">
-            Messagerie
-          </p>
-          <h1 className="mt-2 text-3xl font-bold text-white">Vos conversations</h1>
-          <p className="mt-2 text-sm text-zinc-400">
-            Discutez avec les joueurs de FreightMP.
-          </p>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="section-eyebrow">Messagerie</p>
+            <h1 className="section-title mt-3">Vos conversations</h1>
+            <p className="mt-3 text-sm text-zinc-400">
+              {totalUnread > 0
+                ? `${totalUnread} message${totalUnread > 1 ? "s" : ""} non lu${totalUnread > 1 ? "s" : ""}`
+                : "Discutez avec les joueurs de FreightMP."}
+            </p>
+          </div>
         </div>
+
+        {conversations.length > 0 && (
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Rechercher une conversation…"
+            className="input"
+          />
+        )}
 
         {loading ? (
           <div className="space-y-2">
@@ -85,20 +114,30 @@ export default function MessagesPage() {
             ))}
           </div>
         ) : conversations.length === 0 ? (
-          <div className="card p-8 text-center backdrop-blur">
+          <div className="card p-10 text-center backdrop-blur">
             <p className="text-4xl">💬</p>
-            <p className="mt-3 text-sm text-zinc-400">
-              Aucune conversation. Ouvrez le profil d&apos;un joueur et cliquez sur
-              « Message ».
+            <p className="mt-3 font-semibold text-white">Aucune conversation</p>
+            <p className="mt-1 text-sm text-zinc-400">
+              Ouvrez le profil d&apos;un joueur et cliquez sur « Message ».
             </p>
+            <Link href="/leaderboard" className="btn-primary btn-sm mt-4 inline-flex">
+              Trouver des joueurs
+            </Link>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="card p-10 text-center backdrop-blur">
+            <p className="text-4xl">🔍</p>
+            <p className="mt-3 font-semibold text-white">Aucun résultat</p>
           </div>
         ) : (
           <ul className="space-y-2">
-            {conversations.map((conversation) => (
+            {filtered.map((conversation) => (
               <li key={conversation.user.id}>
                 <Link
                   href={`/messages/${encodeURIComponent(conversation.user.username)}`}
-                  className="flex items-center gap-3 card px-4 py-3 backdrop-blur transition-colors hover:border-white/10 hover:bg-charbon-800"
+                  className={`card card-hover flex items-center gap-3 px-4 py-3 ${
+                    conversation.unread > 0 ? "border-rouge-500/20 bg-rouge-500/5" : ""
+                  }`}
                 >
                   {conversation.user.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -108,20 +147,30 @@ export default function MessagesPage() {
                       className="h-11 w-11 shrink-0 rounded-full object-cover"
                     />
                   ) : (
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rouge-500 to-rouge-600 text-sm font-bold text-white">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rouge-500 to-rouge-700 text-sm font-bold text-white">
                       {conversation.user.username.charAt(0).toUpperCase()}
                     </span>
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-sm font-semibold text-white">
+                      <p
+                        className={`truncate text-sm ${
+                          conversation.unread > 0
+                            ? "font-bold text-white"
+                            : "font-semibold text-zinc-200"
+                        }`}
+                      >
                         {conversation.user.username}
                       </p>
                       <span className="shrink-0 text-xs text-zinc-500">
-                        {formatDate(conversation.lastMessage.createdAt)}
+                        {relativeDate(conversation.lastMessage.createdAt)}
                       </span>
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-zinc-400">
+                    <p
+                      className={`mt-0.5 truncate text-xs ${
+                        conversation.unread > 0 ? "text-zinc-300" : "text-zinc-500"
+                      }`}
+                    >
                       {conversation.lastMessage.fromMe ? "Vous : " : ""}
                       {conversation.lastMessage.body}
                     </p>

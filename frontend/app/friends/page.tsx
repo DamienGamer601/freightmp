@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -12,22 +12,34 @@ import {
   type FriendsResponse,
 } from "@/lib/friends";
 
-function Avatar({ avatarUrl, username }: { avatarUrl: string | null; username: string }) {
+function Avatar({
+  avatarUrl,
+  username,
+  size = "h-10 w-10",
+}: {
+  avatarUrl: string | null;
+  username: string;
+  size?: string;
+}) {
   if (avatarUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={avatarUrl}
-        alt=""
-        className="h-10 w-10 shrink-0 rounded-full object-cover"
-      />
+      <img src={avatarUrl} alt="" className={`${size} shrink-0 rounded-full object-cover`} />
     );
   }
   return (
-    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rouge-500 to-rouge-600 text-sm font-bold text-white">
+    <span
+      className={`${size} flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rouge-500 to-rouge-700 text-sm font-bold text-white`}
+    >
       {username.charAt(0).toUpperCase()}
     </span>
   );
+}
+
+function since(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
 }
 
 export default function FriendsPage() {
@@ -37,6 +49,8 @@ export default function FriendsPage() {
   const [error, setError] = useState<string | null>(null);
   const [username, setUsername] = useState("");
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState("");
+  const [tab, setTab] = useState<"friends" | "incoming" | "outgoing">("friends");
 
   const load = useCallback(() => {
     setLoading(true);
@@ -101,6 +115,12 @@ export default function FriendsPage() {
     }
   };
 
+  const friends = useMemo(() => {
+    const list = data?.friends ?? [];
+    const q = query.trim().toLowerCase();
+    return q ? list.filter((friend) => friend.username.toLowerCase().includes(q)) : list;
+  }, [data, query]);
+
   if (!authLoading && !user) {
     return (
       <section className="relative flex min-h-[70vh] items-center justify-center px-4 py-20">
@@ -108,13 +128,8 @@ export default function FriendsPage() {
         <div className="relative w-full max-w-md card p-8 text-center backdrop-blur">
           <p className="text-5xl">🤝</p>
           <h1 className="mt-4 text-xl font-bold text-white">Connectez-vous</h1>
-          <p className="mt-2 text-sm text-zinc-400">
-            Connectez-vous pour gérer vos amis.
-          </p>
-          <Link
-            href="/"
-            className="mt-6 inline-flex items-center justify-center rounded-xl bg-rouge-500 px-6 py-3 text-sm font-semibold text-white hover:bg-rouge-400"
-          >
+          <p className="mt-2 text-sm text-zinc-400">Connectez-vous pour gérer vos amis.</p>
+          <Link href="/" className="btn-primary mt-6 inline-flex">
             Retour à l&apos;accueil
           </Link>
         </div>
@@ -127,11 +142,9 @@ export default function FriendsPage() {
       <div className="pointer-events-none absolute inset-0 hero-glow" aria-hidden="true" />
       <div className="relative mx-auto max-w-4xl space-y-6">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-widest text-rouge-400">
-            Amis
-          </p>
-          <h1 className="mt-2 text-3xl font-bold text-white">Votre réseau</h1>
-          <p className="mt-2 text-sm text-zinc-400">
+          <p className="section-eyebrow">Amis</p>
+          <h1 className="section-title mt-3">Votre réseau</h1>
+          <p className="mt-3 text-sm text-zinc-400">
             Ajoutez des joueurs, acceptez les demandes et retrouvez vos amis.
           </p>
         </div>
@@ -143,151 +156,173 @@ export default function FriendsPage() {
               e.preventDefault();
               void add(username);
             }}
-            className="flex items-center gap-2"
+            className="flex flex-col gap-2 sm:flex-row sm:items-center"
           >
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Pseudo du joueur à ajouter…"
-              className="min-w-0 flex-1 rounded-lg border border-white/10 bg-charbon-900 px-3 py-2 text-sm text-white outline-none focus:border-white/30"
+              className="input flex-1"
             />
-            <button
-              type="submit"
-              disabled={busy}
-              className="rounded-lg bg-rouge-500 px-4 py-2 text-sm font-semibold text-white hover:bg-rouge-400 disabled:opacity-50"
-            >
+            <button type="submit" disabled={busy} className="btn-primary disabled:opacity-50">
               {busy ? "…" : "Ajouter"}
             </button>
           </form>
           {error && <p className="mt-2 text-sm text-rouge-400">{error}</p>}
         </div>
 
+        {/* Statistiques */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="card p-4 text-center">
+            <p className="text-2xl font-bold text-white">{data?.friends.length ?? 0}</p>
+            <p className="mt-1 text-xs text-zinc-500">Amis</p>
+          </div>
+          <div className="card p-4 text-center">
+            <p className="text-2xl font-bold text-amber-400">{data?.incoming.length ?? 0}</p>
+            <p className="mt-1 text-xs text-zinc-500">Demandes reçues</p>
+          </div>
+          <div className="card p-4 text-center">
+            <p className="text-2xl font-bold text-sky-400">{data?.outgoing.length ?? 0}</p>
+            <p className="mt-1 text-xs text-zinc-500">Envoyées</p>
+          </div>
+        </div>
+
+        {/* Onglets */}
+        <div className="flex items-center rounded-xl border border-white/5 bg-charbon-900/60 p-1">
+          {(
+            [
+              { id: "friends", label: `Amis (${data?.friends.length ?? 0})` },
+              { id: "incoming", label: `Reçues (${data?.incoming.length ?? 0})` },
+              { id: "outgoing", label: `Envoyées (${data?.outgoing.length ?? 0})` },
+            ] as { id: "friends" | "incoming" | "outgoing"; label: string }[]
+          ).map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setTab(item.id)}
+              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                tab === item.id
+                  ? "bg-rouge-500 text-white"
+                  : "text-zinc-400 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
         {loading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-16 animate-pulse rounded-xl bg-white/5" />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-20 animate-pulse rounded-2xl bg-white/5" />
             ))}
           </div>
-        ) : (
+        ) : tab === "friends" ? (
           <>
-            {/* Demandes reçues */}
-            {data && data.incoming.length > 0 && (
-              <div className="rounded-2xl border border-rouge-500/20 bg-rouge-500/5 p-5">
-                <h2 className="text-lg font-semibold text-white">
-                  Demandes reçues
-                  <span className="ml-2 rounded-full bg-rouge-500 px-2 py-0.5 text-xs font-bold text-white">
-                    {data.incoming.length}
-                  </span>
-                </h2>
-                <ul className="mt-3 space-y-2">
-                  {data.incoming.map((request) => (
-                    <li
-                      key={request.id}
-                      className="flex items-center justify-between gap-3 card rounded-xl px-3 py-2"
-                    >
-                      <Link
-                        href={`/p/${encodeURIComponent(request.user.username)}`}
-                        className="flex min-w-0 items-center gap-3"
-                      >
-                        <Avatar
-                          avatarUrl={request.user.avatarUrl}
-                          username={request.user.username}
-                        />
-                        <span className="truncate text-sm font-medium text-white hover:text-rouge-300">
-                          {request.user.username}
-                        </span>
-                      </Link>
-                      <div className="flex shrink-0 gap-1">
-                        <button
-                          type="button"
-                          onClick={() => void accept(request.id)}
-                          className="rounded-lg bg-rouge-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rouge-400"
-                        >
-                          Accepter
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void decline(request.id)}
-                          className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-zinc-300 hover:bg-white/10"
-                        >
-                          Refuser
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            {(data?.friends.length ?? 0) > 3 && (
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Rechercher un ami…"
+                className="input"
+              />
             )}
-
-            {/* Mes amis */}
-            <div className="card p-5 backdrop-blur">
-              <h2 className="text-lg font-semibold text-white">
-                Mes amis
-                <span className="ml-2 text-sm font-normal text-zinc-500">
-                  {data?.friends.length ?? 0}
-                </span>
-              </h2>
-              {data && data.friends.length === 0 ? (
-                <p className="mt-3 text-sm text-zinc-500">
-                  Aucun ami pour le moment. Ajoutez des joueurs ci-dessus !
+            {friends.length === 0 ? (
+              <div className="card p-10 text-center backdrop-blur">
+                <p className="text-4xl">🤝</p>
+                <p className="mt-3 font-semibold text-white">
+                  {(data?.friends.length ?? 0) === 0 ? "Aucun ami pour le moment" : "Aucun résultat"}
                 </p>
-              ) : (
-                <ul className="mt-3 divide-y divide-white/5">
-                  {(data?.friends ?? []).map((friend) => (
-                    <li key={friend.id} className="flex items-center justify-between gap-3 py-3">
+                <p className="mt-1 text-sm text-zinc-400">
+                  {(data?.friends.length ?? 0) === 0
+                    ? "Ajoutez des joueurs avec leur pseudo."
+                    : "Essayez un autre pseudo."}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {friends.map((friend) => (
+                  <div key={friend.id} className="card flex items-center gap-3 p-4">
+                    <Avatar avatarUrl={friend.avatarUrl} username={friend.username} size="h-11 w-11" />
+                    <div className="min-w-0 flex-1">
                       <Link
                         href={`/p/${encodeURIComponent(friend.username)}`}
-                        className="flex min-w-0 items-center gap-3"
+                        className="block truncate text-sm font-semibold text-white hover:text-rouge-300"
                       >
-                        <Avatar avatarUrl={friend.avatarUrl} username={friend.username} />
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-medium text-white hover:text-rouge-300">
-                            {friend.username}
-                          </span>
-                          <span className="block text-xs text-zinc-500">
-                            Amis depuis le{" "}
-                            {new Date(friend.since).toLocaleDateString("fr-FR")}
-                          </span>
-                        </span>
+                        {friend.username}
                       </Link>
-                      <button
-                        type="button"
-                        onClick={() => void remove(friend.id, friend.username)}
-                        className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-zinc-300 hover:bg-white/10"
-                      >
-                        Retirer
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            {/* Demandes envoyées */}
-            {data && data.outgoing.length > 0 && (
-              <div className="card p-5 backdrop-blur">
-                <h2 className="text-lg font-semibold text-white">
-                  Demandes envoyées
-                  <span className="ml-2 text-sm font-normal text-zinc-500">
-                    {data.outgoing.length}
-                  </span>
-                </h2>
-                <ul className="mt-3 space-y-2">
-                  {data.outgoing.map((request) => (
-                    <li
-                      key={request.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2"
+                      <p className="text-xs text-zinc-500">Ami depuis le {since(friend.since)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void remove(friend.id, friend.username)}
+                      className="btn-ghost btn-sm shrink-0"
                     >
-                      <span className="truncate text-sm font-medium text-white">
-                        {request.user.username}
-                      </span>
-                      <span className="shrink-0 text-xs text-amber-400">En attente</span>
-                    </li>
-                  ))}
-                </ul>
+                      Retirer
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </>
+        ) : tab === "incoming" ? (
+          (data?.incoming.length ?? 0) === 0 ? (
+            <div className="card p-10 text-center backdrop-blur">
+              <p className="text-4xl">📭</p>
+              <p className="mt-3 font-semibold text-white">Aucune demande reçue</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {(data?.incoming ?? []).map((request) => (
+                <div key={request.id} className="card flex items-center gap-3 p-4">
+                  <Avatar
+                    avatarUrl={request.user.avatarUrl}
+                    username={request.user.username}
+                    size="h-11 w-11"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      href={`/p/${encodeURIComponent(request.user.username)}`}
+                      className="block truncate text-sm font-semibold text-white hover:text-rouge-300"
+                    >
+                      {request.user.username}
+                    </Link>
+                    <p className="text-xs text-zinc-500">Souhaite vous ajouter</p>
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <button type="button" onClick={() => void accept(request.id)} className="btn-primary btn-sm">
+                      Accepter
+                    </button>
+                    <button type="button" onClick={() => void decline(request.id)} className="btn-ghost btn-sm">
+                      Refuser
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        ) : (data?.outgoing.length ?? 0) === 0 ? (
+          <div className="card p-10 text-center backdrop-blur">
+            <p className="text-4xl">📤</p>
+            <p className="mt-3 font-semibold text-white">Aucune demande envoyée</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {(data?.outgoing ?? []).map((request) => (
+              <div key={request.id} className="card flex items-center gap-3 p-4">
+                <Avatar
+                  avatarUrl={request.user.avatarUrl}
+                  username={request.user.username}
+                  size="h-11 w-11"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-white">{request.user.username}</p>
+                  <p className="text-xs text-zinc-500">Demande en attente</p>
+                </div>
+                <span className="badge badge-warn shrink-0">En attente</span>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </section>

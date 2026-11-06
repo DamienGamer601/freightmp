@@ -17,6 +17,36 @@ function formatTime(value: string): string {
   return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Libellé de séparateur de jour : « Aujourd'hui », « Hier », « 12 mars 2026 ». */
+function dayLabel(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+  if (sameDay(date, today)) return "Aujourd'hui";
+  if (sameDay(date, yesterday)) return "Hier";
+  return date.toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function sameDay(a: string, b: string): boolean {
+  const da = new Date(a);
+  const db = new Date(b);
+  return (
+    da.getFullYear() === db.getFullYear() &&
+    da.getMonth() === db.getMonth() &&
+    da.getDate() === db.getDate()
+  );
+}
+
 export default function ChatPage() {
   const params = useParams<{ username: string }>();
   const username = decodeURIComponent(params.username ?? "");
@@ -28,6 +58,7 @@ export default function ChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => {
     fetchConversation(username)
@@ -74,13 +105,8 @@ export default function ChatPage() {
         <div className="relative w-full max-w-md card p-8 text-center backdrop-blur">
           <p className="text-5xl">💬</p>
           <h1 className="mt-4 text-xl font-bold text-white">Connectez-vous</h1>
-          <p className="mt-2 text-sm text-zinc-400">
-            Connectez-vous pour envoyer des messages.
-          </p>
-          <Link
-            href="/"
-            className="mt-6 inline-flex items-center justify-center rounded-xl bg-rouge-500 px-6 py-3 text-sm font-semibold text-white hover:bg-rouge-400"
-          >
+          <p className="mt-2 text-sm text-zinc-400">Connectez-vous pour envoyer des messages.</p>
+          <Link href="/" className="btn-primary mt-6 inline-flex">
             Retour à l&apos;accueil
           </Link>
         </div>
@@ -115,57 +141,76 @@ export default function ChatPage() {
           <div className="flex items-center gap-3 border-b border-white/5 px-5 py-4">
             {other?.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={other.avatarUrl}
-                alt=""
-                className="h-10 w-10 rounded-full object-cover"
-              />
+              <img src={other.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
             ) : (
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-rouge-500 to-rouge-600 text-sm font-bold text-white">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-rouge-500 to-rouge-700 text-sm font-bold text-white">
                 {(other?.username ?? username).charAt(0).toUpperCase()}
               </span>
             )}
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <Link
                 href={`/p/${encodeURIComponent(username)}`}
                 className="truncate text-sm font-semibold text-white hover:text-rouge-300"
               >
                 {other?.username ?? username}
               </Link>
-              <p className="text-xs text-zinc-500">Conversation privée</p>
+              <p className="text-xs text-zinc-500">
+                {messages.length} message{messages.length > 1 ? "s" : ""} · conversation privée
+              </p>
             </div>
+            <Link href={`/p/${encodeURIComponent(username)}`} className="btn-ghost btn-sm">
+              Profil
+            </Link>
           </div>
 
           {/* Messages */}
-          <div className="flex h-[460px] flex-col gap-2 overflow-y-auto px-5 py-4">
+          <div
+            ref={scrollRef}
+            className="flex h-[460px] flex-col gap-2 overflow-y-auto px-5 py-4"
+          >
             {messages.length === 0 ? (
-              <p className="my-auto text-center text-sm text-zinc-500">
-                Aucun message. Commencez la conversation !
-              </p>
+              <div className="my-auto text-center">
+                <p className="text-3xl">👋</p>
+                <p className="mt-2 text-sm text-zinc-500">
+                  Aucun message. Commencez la conversation !
+                </p>
+              </div>
             ) : (
-              messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.fromMe ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
-                      message.fromMe
-                        ? "rounded-br-md bg-rouge-500 text-white"
-                        : "rounded-bl-md bg-carbone-600 text-zinc-100"
-                    }`}
-                  >
-                    <p className="whitespace-pre-line break-words">{message.body}</p>
-                    <p
-                      className={`mt-1 text-right text-[10px] ${
-                        message.fromMe ? "text-rouge-100/80" : "text-zinc-400"
-                      }`}
-                    >
-                      {formatTime(message.createdAt)}
-                    </p>
+              messages.map((message, index) => {
+                const previous = index > 0 ? messages[index - 1] : null;
+                const showDay = !previous || !sameDay(previous.createdAt, message.createdAt);
+                return (
+                  <div key={message.id}>
+                    {showDay && (
+                      <div className="my-2 flex items-center gap-3">
+                        <span className="h-px flex-1 bg-white/5" />
+                        <span className="text-[11px] font-medium text-zinc-500">
+                          {dayLabel(message.createdAt)}
+                        </span>
+                        <span className="h-px flex-1 bg-white/5" />
+                      </div>
+                    )}
+                    <div className={`flex ${message.fromMe ? "justify-end" : "justify-start"}`}>
+                      <div
+                        className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
+                          message.fromMe
+                            ? "rounded-br-md bg-rouge-500 text-white"
+                            : "rounded-bl-md bg-carbone-600 text-zinc-100"
+                        }`}
+                      >
+                        <p className="whitespace-pre-line break-words">{message.body}</p>
+                        <p
+                          className={`mt-1 text-right text-[10px] ${
+                            message.fromMe ? "text-rouge-100/80" : "text-zinc-400"
+                          }`}
+                        >
+                          {formatTime(message.createdAt)}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
             <div ref={bottomRef} />
           </div>
@@ -176,19 +221,26 @@ export default function ChatPage() {
               e.preventDefault();
               void send();
             }}
-            className="flex items-center gap-2 border-t border-white/5 px-4 py-3"
+            className="flex items-end gap-2 border-t border-white/5 px-4 py-3"
           >
-            <input
+            <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Votre message…"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
+              placeholder="Votre message… (Entrée pour envoyer, Maj+Entrée pour un saut de ligne)"
+              rows={1}
               maxLength={2000}
-              className="min-w-0 flex-1 rounded-lg border border-white/10 bg-charbon-900 px-3 py-2 text-sm text-white outline-none focus:border-white/30"
+              className="input max-h-32 min-h-[2.5rem] min-w-0 flex-1 resize-none py-2"
             />
             <button
               type="submit"
               disabled={sending || !draft.trim()}
-              className="rounded-lg bg-rouge-500 px-4 py-2 text-sm font-semibold text-white hover:bg-rouge-400 disabled:opacity-50"
+              className="btn-primary disabled:opacity-50"
             >
               {sending ? "…" : "Envoyer"}
             </button>
