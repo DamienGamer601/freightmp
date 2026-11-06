@@ -135,6 +135,7 @@ export class GameServer {
             p: player.latencyMs ?? 0,
             g: player.tag,
             c: player.country,
+            r: player.role ?? "DRIVER",
           })),
         });
         for (const player of room.players.values()) {
@@ -245,6 +246,93 @@ export class GameServer {
         if (typeof message.timeOfDay === "number") {
           room.timeOfDay =
             ((Math.round(message.timeOfDay) % 1440) + 1440) % 1440;
+        }
+        this.broadcastEnvironment(room);
+        break;
+      }
+      /* ---------- Commandes admin (panneau in-game) ---------- */
+      case "kick": {
+        const room = this.findRoomOfPlayer(key);
+        const player = room?.players.get(key);
+        if (!room || !player) {
+          break;
+        }
+        if (player.role !== "ADMIN" && player.role !== "MODERATOR") {
+          this.sendTo(rinfo, { t: "error", reason: "Réservé aux admins" });
+          break;
+        }
+        const targetNumId = Number(message.target);
+        if (!Number.isFinite(targetNumId)) {
+          break;
+        }
+        for (const [otherKey, other] of room.players) {
+          if (other.numId !== targetNumId) {
+            continue;
+          }
+          if (otherKey === key) {
+            this.sendTo(rinfo, { t: "error", reason: "Impossible de s'expulser soi-même" });
+            break;
+          }
+          if (other.role === "ADMIN" && player.role !== "ADMIN") {
+            this.sendTo(rinfo, { t: "error", reason: "Un modérateur ne peut pas expulser un admin" });
+            break;
+          }
+          const reason =
+            typeof message.reason === "string" && message.reason.length > 0
+              ? message.reason.slice(0, 120)
+              : "Expulsé par un administrateur";
+          this.udp.send(encode({ t: "kicked", reason }), other.port, other.address);
+          room.players.delete(otherKey);
+          this.sendTo(rinfo, {
+            t: "admin-ok",
+            action: "kick",
+            detail: `Joueur ${targetNumId} expulsé`,
+          });
+          break;
+        }
+        break;
+      }
+      case "announce": {
+        const room = this.findRoomOfPlayer(key);
+        const player = room?.players.get(key);
+        if (!room || !player) {
+          break;
+        }
+        if (player.role !== "ADMIN" && player.role !== "MODERATOR") {
+          this.sendTo(rinfo, { t: "error", reason: "Réservé aux admins" });
+          break;
+        }
+        const text =
+          typeof message.message === "string" ? message.message.trim().slice(0, 200) : "";
+        if (!text) {
+          break;
+        }
+        const packet = encode({
+          t: "chat",
+          numId: 0,
+          name: "ADMIN",
+          message: text,
+          system: true,
+        });
+        for (const other of room.players.values()) {
+          this.udp.send(packet, other.port, other.address);
+        }
+        this.sendTo(rinfo, { t: "admin-ok", action: "announce", detail: "Annonce diffusée" });
+        break;
+      }
+      case "time": {
+        const room = this.findRoomOfPlayer(key);
+        const player = room?.players.get(key);
+        if (!room || !player) {
+          break;
+        }
+        if (player.role !== "ADMIN" && player.role !== "MODERATOR") {
+          this.sendTo(rinfo, { t: "error", reason: "Réservé aux admins" });
+          break;
+        }
+        const delta = Number(message.delta);
+        if (Number.isFinite(delta)) {
+          room.timeOfDay = ((room.timeOfDay + Math.round(delta)) % 1440 + 1440) % 1440;
         }
         this.broadcastEnvironment(room);
         break;
@@ -426,6 +514,7 @@ export class GameServer {
       numId: player.numId,
       roomId: room.id,
       tick: room.tick,
+      role: player.role ?? "DRIVER",
     });
   }
 

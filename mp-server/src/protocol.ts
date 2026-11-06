@@ -38,23 +38,43 @@ export type ClientMessage =
   | { t: "ping"; ts: number }
   | { t: "chat"; message: string }
   | { t: "latency"; value: number }
-  | { t: "set-environment"; weather?: string; timeOfDay?: number };
+  | { t: "set-environment"; weather?: string; timeOfDay?: number }
+  /* ---------- Commandes admin (panneau in-game F8) ---------- */
+  | { t: "kick"; target: number; reason?: string }
+  | { t: "announce"; message: string }
+  | { t: "time"; delta: number };
 
 /* ---------- Serveur → Client ---------- */
 
 export type ServerMessage =
-  | { t: "join-ok"; playerId: string; numId: number; roomId: string; tick: number }
+  | {
+      t: "join-ok";
+      playerId: string;
+      numId: number;
+      roomId: string;
+      tick: number;
+      role?: string;
+    }
   | { t: "join-err"; reason: string }
   | { t: "snapshot"; tick: number; serverTime: number; players: PlayerState[] }
   | { t: "pong"; ts: number }
   | { t: "error"; reason: string }
   | {
       t: "players";
-      players: { n: number; u: string; p: number; g?: string; c?: string }[];
+      players: { n: number; u: string; p: number; g?: string; c?: string; r?: string }[];
     }
-  | { t: "chat"; numId: number; name: string; message: string; at: number }
+  | {
+      t: "chat";
+      numId: number;
+      name: string;
+      message: string;
+      at: number;
+      system?: boolean;
+    }
   | { t: "collision"; other: number; x: number; z: number; at: number }
-  | { t: "environment"; weather: string; timeOfDay: number; at: number };
+  | { t: "environment"; weather: string; timeOfDay: number; at: number }
+  | { t: "kicked"; reason: string }
+  | { t: "admin-ok"; action: string; detail: string };
 
 export function encode(message: ClientMessage | ServerMessage): Buffer {
   return Buffer.from(JSON.stringify(message), "utf8");

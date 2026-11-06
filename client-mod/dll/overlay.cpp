@@ -279,6 +279,113 @@ void drawTabPanel(ID2D1RenderTarget* target) {
   }
 }
 
+/* ---------- Panneau admin in-game (F8) ---------- */
+
+/** Panneau admin : joueurs (gauche) + actions (droite) + retour d'action. */
+void drawAdminPanel(ID2D1RenderTarget* target) {
+  const auto players = getSortedPlayers();
+  const auto actions = getAdminActions();
+  const int selected = getAdminSelected();
+  const int action = getAdminAction();
+  const std::string feedback = getAdminFeedback();
+  const std::string role = getLocalRole();
+
+  const float width = 900.0f;
+  const int rows = static_cast<int>(players.size());
+  const float height = 150.0f + static_cast<float>(rows) * 22.0f +
+                       static_cast<float>(actions.size()) * 22.0f;
+  const float x = 60.0f;
+  const float y = 80.0f;
+
+  if (g_bgBrush != nullptr) {
+    target->FillRectangle(D2D1::RectF(x, y, x + width, y + height), g_bgBrush);
+  }
+  if (g_titleFormat == nullptr || g_bodyFormat == nullptr) {
+    return;
+  }
+
+  wchar_t buffer[256];
+
+  swprintf_s(buffer, L"PANNEAU ADMIN  -  role : %hs", role.c_str());
+  target->DrawText(buffer, static_cast<UINT32>(wcslen(buffer)), g_titleFormat,
+                   D2D1::RectF(x + 20.0f, y + 10.0f, x + width, y + 36.0f),
+                   g_accentBrush);
+
+  target->DrawText(L"F8 fermer  -  fleches naviguer  -  Entree executer", 49,
+                   g_bodyFormat,
+                   D2D1::RectF(x + 20.0f, y + 36.0f, x + width, y + 54.0f),
+                   g_textBrush);
+
+  // Colonne gauche : joueurs.
+  float rowY = y + 62.0f;
+  target->DrawText(L"JOUEURS", 7, g_bodyFormat,
+                   D2D1::RectF(x + 20.0f, rowY, x + 420.0f, rowY + 18.0f),
+                   g_accentBrush);
+  rowY += 20.0f;
+
+  if (rows == 0) {
+    target->DrawText(L"  (aucun joueur)", 15, g_bodyFormat,
+                     D2D1::RectF(x + 20.0f, rowY, x + 420.0f, rowY + 18.0f),
+                     g_textBrush);
+    rowY += 22.0f;
+  } else {
+    for (int index = 0; index < rows; ++index) {
+      const RemotePlayer& player = players[index];
+      if (index == selected && g_radarBrush != nullptr) {
+        target->FillRectangle(
+            D2D1::RectF(x + 12.0f, rowY - 2.0f, x + 430.0f, rowY + 18.0f),
+            g_radarBrush);
+      }
+      const std::string name = getPlayerName(player.numId);
+      const std::string playerRole = getPlayerRole(player.numId);
+      const std::string label =
+          name.empty() ? ("Camion #" + std::to_string(player.numId)) : name;
+      swprintf_s(buffer, L"#%u  %hs  [%hs]", player.numId, label.c_str(),
+                 playerRole.c_str());
+      target->DrawText(buffer, static_cast<UINT32>(wcslen(buffer)),
+                       g_bodyFormat,
+                       D2D1::RectF(x + 20.0f, rowY, x + 430.0f, rowY + 18.0f),
+                       g_textBrush);
+      rowY += 22.0f;
+    }
+  }
+
+  // Colonne droite : actions.
+  float actionY = y + 62.0f;
+  target->DrawText(L"ACTIONS", 7, g_bodyFormat,
+                   D2D1::RectF(x + 460.0f, actionY, x + width - 20.0f,
+                               actionY + 18.0f),
+                   g_accentBrush);
+  actionY += 20.0f;
+
+  for (int index = 0; index < static_cast<int>(actions.size()); ++index) {
+    if (index == action && g_radarBrush != nullptr) {
+      target->FillRectangle(
+          D2D1::RectF(x + 452.0f, actionY - 2.0f, x + width - 12.0f,
+                      actionY + 18.0f),
+          g_radarBrush);
+    }
+    const std::wstring wide(actions[index].begin(), actions[index].end());
+    target->DrawText(wide.c_str(), static_cast<UINT32>(wide.size()),
+                     g_bodyFormat,
+                     D2D1::RectF(x + 460.0f, actionY, x + width - 20.0f,
+                                 actionY + 18.0f),
+                     g_textBrush);
+    actionY += 22.0f;
+  }
+
+  // Retour de la dernière action.
+  if (!feedback.empty()) {
+    const float feedbackY = y + height - 32.0f;
+    const std::wstring wide(feedback.begin(), feedback.end());
+    swprintf_s(buffer, L"> %ls", wide.c_str());
+    target->DrawText(buffer, static_cast<UINT32>(wcslen(buffer)), g_bodyFormat,
+                     D2D1::RectF(x + 20.0f, feedbackY, x + width - 20.0f,
+                                 feedbackY + 20.0f),
+                     g_accentBrush);
+  }
+}
+
 /** Alerte de collision (bandeau rouge en haut, 3 s). */
 void drawCollisionWarning(ID2D1RenderTarget* target, float screenWidth) {
   const CollisionAlert alert = getLastCollision();
@@ -460,6 +567,11 @@ void overlayRender(IDXGISwapChain* swapChain) {
   // Panneau TAB (touche TAB).
   if (isTabPanelVisible()) {
     drawTabPanel(g_renderTarget);
+  }
+
+  // Panneau admin in-game (touche F8).
+  if (isAdminPanelVisible()) {
+    drawAdminPanel(g_renderTarget);
   }
 
   // Chat in-game (Y pour saisir).

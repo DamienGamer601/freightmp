@@ -114,4 +114,30 @@ bool isChatOpen();
 /** Contenu en cours de saisie. */
 std::string getChatInput();
 
+/* ---------- Panneau admin in-game (F8) ---------- */
+
+/** Rôle FreightMP d'un joueur distant ("ADMIN", "MODERATOR", "DRIVER"). */
+std::string getPlayerRole(uint16_t numId);
+
+/** Rôle du joueur local (renseigné après le join). */
+std::string getLocalRole();
+
+/** Vrai si le joueur local peut utiliser le panneau admin. */
+bool isLocalAdmin();
+
+/** Vrai si le panneau admin doit être affiché. */
+bool isAdminPanelVisible();
+
+/** Index du joueur sélectionné dans le panneau admin. */
+int getAdminSelected();
+
+/** Index de l'action sélectionnée dans le panneau admin. */
+int getAdminAction();
+
+/** Libellés des actions admin disponibles. */
+std::vector<std::string> getAdminActions();
+
+/** Dernier retour d'action admin (vide si aucun). */
+std::string getAdminFeedback();
+
 }  // namespace fmp

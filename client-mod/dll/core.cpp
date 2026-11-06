@@ -46,6 +46,27 @@ int g_tabSelected = 0;
 bool g_showTabPanel = false;
 Interpolator g_interp;
 
+/* ---------- Panneau admin (F8) ---------- */
+bool g_showAdminPanel = false;
+int g_adminSelected = 0;
+int g_adminAction = 0;
+std::string g_adminFeedback;
+std::string g_localRole = "DRIVER";
+std::map<uint16_t, std::string> g_playerRoles;
+bool g_adminAnnounce = false;
+
+/** Actions proposées dans le panneau admin (index stable). */
+const std::vector<std::string> kAdminActions = {
+    "Expulser le joueur selectionne",
+    "Meteo : clair",
+    "Meteo : pluie",
+    "Meteo : brouillard",
+    "Meteo : neige",
+    "Heure +1 h",
+    "Heure -1 h",
+    "Annonce (saisie chat)",
+};
+
 bool keyDown(int vk);  // défini plus bas (section chat)
 
 /** Thread qui gère la touche TAB + navigation + mute. */
@@ -137,6 +158,45 @@ void sendChatMessage(const std::string& text) {
          reinterpret_cast<sockaddr*>(&g_server), sizeof(g_server));
 }
 
+/* ---------- Envoi des commandes admin ---------- */
+
+void sendRaw(const std::string& json) {
+  if (g_socket == INVALID_SOCKET || json.empty()) {
+    return;
+  }
+  sendto(g_socket, json.c_str(), static_cast<int>(json.size()), 0,
+         reinterpret_cast<sockaddr*>(&g_server), sizeof(g_server));
+}
+
+/** Change la météo (et conserve l'heure courante). */
+void sendAdminWeather(const std::string& weather) {
+  char buffer[160];
+  snprintf(buffer, sizeof(buffer),
+           "{\"t\":\"set-environment\",\"weather\":\"%s\",\"timeOfDay\":%d}",
+           weather.c_str(), g_environment.timeOfDay);
+  sendRaw(buffer);
+}
+
+/** Décale l'heure du jour de `delta` minutes (serveur : 0-1439). */
+void sendAdminTimeDelta(int delta) {
+  char buffer[96];
+  snprintf(buffer, sizeof(buffer), "{\"t\":\"time\",\"delta\":%d}", delta);
+  sendRaw(buffer);
+}
+
+/** Expulse un joueur par son numId. */
+void sendAdminKick(uint16_t numId) {
+  char buffer[96];
+  snprintf(buffer, sizeof(buffer), "{\"t\":\"kick\",\"target\":%u}",
+           static_cast<unsigned>(numId));
+  sendRaw(buffer);
+}
+
+/** Diffuse une annonce à toute la salle. */
+void sendAdminAnnounce(const std::string& text) {
+  sendRaw("{\"t\":\"announce\",\"message\":\"" + escapeJson(text) + "\"}");
+}
+
 /** Thread de saisie du chat (Y pour ouvrir, Entrée pour envoyer). */
 DWORD WINAPI ChatThread(LPVOID) {
   bool prev[256] = {};
@@ -172,14 +232,128 @@ DWORD WINAPI ChatThread(LPVOID) {
       }
       if (keyDown(VK_RETURN) && !prev[VK_RETURN]) {
         if (!g_chatInput.empty()) {
-          sendChatMessage(g_chatInput);
+          if (g_adminAnnounce) {
+            sendAdminAnnounce(g_chatInput);
+            g_adminFeedback = "Annonce envoyee";
+          } else {
+            sendChatMessage(g_chatInput);
+          }
           g_chatInput.clear();
         }
+        g_adminAnnounce = false;
         g_chatOpen = false;
       }
       if (keyDown(VK_ESCAPE) && !prev[VK_ESCAPE]) {
         g_chatInput.clear();
+        g_adminAnnounce = false;
         g_chatOpen = false;
+      }
+    }
+
+    for (int vk = 0; vk < 256; ++vk) {
+      prev[vk] = keyDown(vk);
+    }
+    Sleep(16);
+  }
+  return 0;
+}
+
+/* ---------- Panneau admin in-game (F8) ---------- */
+
+/**
+ * Exécute l'action admin sélectionnée.
+ * `sorted` = joueurs triés (pour l'expulsion).
+ */
+void executeAdminAction(const std::vector<RemotePlayer>& sorted) {
+  switch (g_adminAction) {
+    case 0: {  // Expulser
+      if (sorted.empty()) {
+        g_adminFeedback = "Aucun joueur a expulser";
+        break;
+      }
+      if (g_adminSelected >= static_cast<int>(sorted.size())) {
+        g_adminSelected = 0;
+      }
+      const uint16_t id = sorted[g_adminSelected].numId;
+      sendAdminKick(id);
+      g_adminFeedback = "Expulsion demandee (#" + std::to_string(id) + ")";
+      break;
+    }
+    case 1:
+      sendAdminWeather("clear");
+      g_adminFeedback = "Meteo : clair";
+      break;
+    case 2:
+      sendAdminWeather("rain");
+      g_adminFeedback = "Meteo : pluie";
+      break;
+    case 3:
+      sendAdminWeather("fog");
+      g_adminFeedback = "Meteo : brouillard";
+      break;
+    case 4:
+      sendAdminWeather("snow");
+      g_adminFeedback = "Meteo : neige";
+      break;
+    case 5:
+      sendAdminTimeDelta(60);
+      g_adminFeedback = "Heure +1 h";
+      break;
+    case 6:
+      sendAdminTimeDelta(-60);
+      g_adminFeedback = "Heure -1 h";
+      break;
+    case 7:  // Annonce : on ouvre la saisie du chat en mode annonce
+      g_adminAnnounce = true;
+      g_chatOpen = true;
+      g_chatInput.clear();
+      g_showAdminPanel = false;
+      g_adminFeedback = "Saisissez l'annonce puis Entree";
+      break;
+    default:
+      break;
+  }
+}
+
+/** Thread du panneau admin (F8) : navigation + exécution. */
+DWORD WINAPI AdminPanelThread(LPVOID) {
+  bool prev[256] = {};
+  while (true) {
+    if (keyDown(VK_F8) && !prev[VK_F8]) {
+      g_showAdminPanel = !g_showAdminPanel;
+      g_adminSelected = 0;
+      g_adminAction = 0;
+      if (!isLocalAdmin()) {
+        g_adminFeedback = "Reserve aux admins";
+      }
+    }
+
+    if (g_showAdminPanel && isLocalAdmin()) {
+      const auto sorted = getSortedPlayers();
+      const int playerCount = static_cast<int>(sorted.size());
+      const int actionCount = static_cast<int>(kAdminActions.size());
+
+      if (playerCount > 0 && g_adminSelected >= playerCount) {
+        g_adminSelected = playerCount - 1;
+      }
+
+      if (keyDown(VK_DOWN) && !prev[VK_DOWN] && playerCount > 0) {
+        g_adminSelected = (g_adminSelected + 1) % playerCount;
+      }
+      if (keyDown(VK_UP) && !prev[VK_UP] && playerCount > 0) {
+        g_adminSelected = (g_adminSelected - 1 + playerCount) % playerCount;
+      }
+      if (keyDown(VK_RIGHT) && !prev[VK_RIGHT]) {
+        g_adminAction = (g_adminAction + 1) % actionCount;
+      }
+      if (keyDown(VK_LEFT) && !prev[VK_LEFT]) {
+        g_adminAction = (g_adminAction - 1 + actionCount) % actionCount;
+      }
+      if (keyDown(VK_RETURN) && !prev[VK_RETURN]) {
+        executeAdminAction(sorted);
+      }
+      if (keyDown(VK_ESCAPE) && !prev[VK_ESCAPE]) {
+        g_showAdminPanel = false;
       }
     }
 
@@ -366,6 +540,7 @@ void handleMessage(const unsigned char* data, int length) {
       std::map<uint16_t, uint16_t> nextPings;
       std::map<uint16_t, std::string> nextTags;
       std::map<uint16_t, std::string> nextCountries;
+      std::map<uint16_t, std::string> nextRoles;
       size_t pos = 0;
       while ((pos = json.find("{\"n\":", pos)) != std::string::npos) {
         const int numId = std::atoi(json.c_str() + pos + 5);
@@ -407,12 +582,23 @@ void handleMessage(const unsigned char* data, int length) {
           }
         }
 
+        const size_t rPos = json.find("\"r\":\"", nameEnd);
+        if (rPos != std::string::npos) {
+          const size_t rStart = rPos + 5;
+          const size_t rEnd = json.find('"', rStart);
+          if (rEnd != std::string::npos) {
+            nextRoles[static_cast<uint16_t>(numId)] =
+                json.substr(rStart, rEnd - rStart);
+          }
+        }
+
         pos = nameEnd;
       }
       g_playerNames = std::move(next);
       g_playerPings = std::move(nextPings);
       g_playerTags = std::move(nextTags);
       g_playerCountries = std::move(nextCountries);
+      g_playerRoles = std::move(nextRoles);
       return;
     }
 
@@ -481,9 +667,45 @@ void handleMessage(const unsigned char* data, int length) {
       if (pos != std::string::npos) {
         g_myNumId = static_cast<uint16_t>(std::atoi(json.c_str() + pos + 8));
       }
-      logLine("rejoint la salle (numId=%u)", g_myNumId);
+      const size_t rolePos = json.find("\"role\":\"");
+      if (rolePos != std::string::npos) {
+        const size_t start = rolePos + 8;
+        const size_t end = json.find('"', start);
+        if (end != std::string::npos) {
+          g_localRole = json.substr(start, end - start);
+        }
+      }
+      logLine("rejoint la salle (numId=%u, role=%s)", g_myNumId,
+              g_localRole.c_str());
+      if (isLocalAdmin()) {
+        g_adminFeedback = "Panneau admin : F8";
+      }
     } else if (json.find("\"join-err\"") != std::string::npos) {
       logLine("join refuse : %s", json.c_str());
+    } else if (json.find("\"t\":\"kicked\"") != std::string::npos) {
+      // Le serveur nous a expulsés.
+      g_adminFeedback = "Vous avez ete expulse";
+      g_joined = false;
+      g_players.clear();
+      logLine("expulse de la salle : %s", json.c_str());
+    } else if (json.find("\"t\":\"admin-ok\"") != std::string::npos) {
+      const size_t detailPos = json.find("\"detail\":\"");
+      if (detailPos != std::string::npos) {
+        const size_t start = detailPos + 10;
+        const size_t end = json.find('"', start);
+        if (end != std::string::npos) {
+          g_adminFeedback = json.substr(start, end - start);
+        }
+      }
+    } else if (json.find("\"t\":\"error\"") != std::string::npos) {
+      const size_t reasonPos = json.find("\"reason\":\"");
+      if (reasonPos != std::string::npos) {
+        const size_t start = reasonPos + 10;
+        const size_t end = json.find('"', start);
+        if (end != std::string::npos) {
+          g_adminFeedback = json.substr(start, end - start);
+        }
+      }
     }
   }
 }
@@ -538,6 +760,13 @@ void run() {
   HANDLE chatThread = CreateThread(nullptr, 0, ChatThread, nullptr, 0, nullptr);
   if (chatThread != nullptr) {
     CloseHandle(chatThread);
+  }
+
+  // Thread du panneau admin in-game (F8).
+  HANDLE adminThread =
+      CreateThread(nullptr, 0, AdminPanelThread, nullptr, 0, nullptr);
+  if (adminThread != nullptr) {
+    CloseHandle(adminThread);
   }
 
   // Adaptateur moteur : tentative de résolution des hooks 3D (spawn/update).
@@ -757,6 +986,44 @@ bool isChatOpen() {
 
 std::string getChatInput() {
   return g_chatInput;
+}
+
+/* ---------- Panneau admin in-game (F8) ---------- */
+
+std::string getPlayerRole(uint16_t numId) {
+  const auto it = g_playerRoles.find(numId);
+  if (it == g_playerRoles.end()) {
+    return "DRIVER";
+  }
+  return it->second;
+}
+
+std::string getLocalRole() {
+  return g_localRole;
+}
+
+bool isLocalAdmin() {
+  return g_localRole == "ADMIN" || g_localRole == "MODERATOR";
+}
+
+bool isAdminPanelVisible() {
+  return g_showAdminPanel;
+}
+
+int getAdminSelected() {
+  return g_adminSelected;
+}
+
+int getAdminAction() {
+  return g_adminAction;
+}
+
+std::vector<std::string> getAdminActions() {
+  return kAdminActions;
+}
+
+std::string getAdminFeedback() {
+  return g_adminFeedback;
 }
 
 }  // namespace fmp
