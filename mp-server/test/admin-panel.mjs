@@ -99,12 +99,53 @@ function makeClient() {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function main() {
+  // --- Fausse API FreightMP (vérification + création de bans) ---
+  const bans = new Map(); // userId -> { reason }
+  const apiServer = http.createServer((req, res) => {
+    const url = new URL(req.url, "http://localhost");
+    res.setHeader("Content-Type", "application/json");
+
+    if (req.method === "GET" && url.pathname === "/api/v1/internal/bans/check") {
+      if (req.headers["x-internal-key"] !== "test-key") {
+        res.statusCode = 403;
+        res.end(JSON.stringify({ error: "forbidden" }));
+        return;
+      }
+      const userId = url.searchParams.get("userId") ?? "";
+      const ban = bans.get(userId);
+      res.end(JSON.stringify(ban ? { banned: true, reason: ban.reason } : { banned: false }));
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/v1/internal/bans") {
+      let body = "";
+      req.on("data", (chunk) => (body += chunk));
+      req.on("end", () => {
+        try {
+          const parsed = JSON.parse(body);
+          bans.set(parsed.userId, { reason: parsed.reason });
+          res.end(JSON.stringify({ ok: true }));
+        } catch {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: "bad json" }));
+        }
+      });
+      return;
+    }
+
+    res.statusCode = 404;
+    res.end(JSON.stringify({ error: "not found" }));
+  });
+  await new Promise((resolve) => apiServer.listen(5193, "127.0.0.1", resolve));
+
   const server = new GameServer({
     udpPort: UDP_PORT,
     httpPort: HTTP_PORT,
     tickRate: 20,
     jwtSecret: JWT_SECRET,
     requireAuth: false,
+    apiUrl: "http://127.0.0.1:5193",
+    internalApiKey: "test-key",
   });
   await server.start();
   await sleep(150);
@@ -179,9 +220,36 @@ async function main() {
   const selfKick = await admin.waitFor((m) => m.t === "error");
   assert(selfKick.reason.includes("soi-même"), "auto-expulsion refusée");
 
+  console.log("\n=== ban (via l'API) ===");
+  const victim = makeClient();
+  const victimToken = jwt.sign(
+    { kind: "mp", sub: "u-victim", username: "Victime", role: "DRIVER" },
+    JWT_SECRET,
+    { expiresIn: "1h" },
+  );
+  victim.send({ t: "join", roomId, truckId: "victim-truck", token: victimToken });
+  const victimJoin = await victim.waitFor((m) => m.t === "join-ok");
+  assert(typeof victimJoin.numId === "number", "le futur banni rejoint d'abord");
+
+  await sleep(300);
+  admin.send({ t: "ban", target: victimJoin.numId, reason: "Conduite dangereuse" });
+  const victimKicked = await victim.waitFor((m) => m.t === "kicked");
+  assert(victimKicked.reason.includes("Banni"), "le banni reçoit kicked");
+  const banOk = await admin.waitFor((m) => m.t === "admin-ok" && m.action === "ban");
+  assert(banOk.detail.includes("Conduite dangereuse"), "l'admin reçoit admin-ok");
+  assert(bans.get("u-victim")?.reason === "Conduite dangereuse", "ban enregistré via l'API");
+
+  victim.socket.close();
+  const rejoin = makeClient();
+  rejoin.send({ t: "join", roomId, truckId: "victim-truck", token: victimToken });
+  const rejoinErr = await rejoin.waitFor((m) => m.t === "join-err");
+  assert(rejoinErr.reason.includes("banni"), "un compte banni est refusé au join");
+  rejoin.socket.close();
+
   admin.socket.close();
   driver.socket.close();
   server.stop();
+  await new Promise((resolve) => apiServer.close(resolve));
 
   console.log("");
   if (failures === 0) {

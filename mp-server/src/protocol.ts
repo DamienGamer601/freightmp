@@ -42,7 +42,8 @@ export type ClientMessage =
   /* ---------- Commandes admin (panneau in-game F8) ---------- */
   | { t: "kick"; target: number; reason?: string }
   | { t: "announce"; message: string }
-  | { t: "time"; delta: number };
+  | { t: "time"; delta: number }
+  | { t: "ban"; target?: number; username?: string; reason?: string };
 
 /* ---------- Serveur → Client ---------- */
 

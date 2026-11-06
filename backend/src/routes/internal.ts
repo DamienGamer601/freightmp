@@ -111,6 +111,70 @@ router.post(
   }),
 );
 
+/* ---------- Bans (utilisés par le serveur multijoueur) ---------- */
+
+/** GET /api/v1/internal/bans/check?userId=… — un compte est-il banni ? */
+router.get(
+  "/bans/check",
+  asyncHandler(async (req, res) => {
+    const userId = typeof req.query.userId === "string" ? req.query.userId : "";
+    if (!userId) {
+      res.json({ banned: false });
+      return;
+    }
+
+    const now = new Date();
+    const ban = await prisma.ban.findFirst({
+      where: {
+        userId,
+        active: true,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!ban) {
+      res.json({ banned: false });
+      return;
+    }
+
+    res.json({
+      banned: true,
+      type: ban.type,
+      reason: ban.reason,
+      expiresAt: ban.expiresAt,
+    });
+  }),
+);
+
+const createBanSchema = z.object({
+  userId: z.string().min(1),
+  issuerId: z.string().min(1),
+  type: z.enum(["WARNING", "TEMPORARY", "PERMANENT"]).optional(),
+  reason: z.string().min(3).max(500),
+  expiresAt: z.string().optional(),
+});
+
+/** POST /api/v1/internal/bans — crée un ban (panneau admin in-game). */
+router.post(
+  "/bans",
+  asyncHandler(async (req, res) => {
+    const body = createBanSchema.parse(req.body);
+
+    const ban = await prisma.ban.create({
+      data: {
+        userId: body.userId,
+        issuerId: body.issuerId,
+        type: body.type ?? "PERMANENT",
+        reason: body.reason,
+        expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
+      },
+    });
+
+    res.json({ ok: true, ban: { id: ban.id, type: ban.type, reason: ban.reason } });
+  }),
+);
+
 const roleSchema = z.object({
   userId: z.string().min(1),
   role: z.enum(["DRIVER", "MODERATOR", "ADMIN", "DEV"]),

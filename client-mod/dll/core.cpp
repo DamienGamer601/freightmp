@@ -58,6 +58,7 @@ bool g_adminAnnounce = false;
 /** Actions proposées dans le panneau admin (index stable). */
 const std::vector<std::string> kAdminActions = {
     "Expulser le joueur selectionne",
+    "Bannir le joueur selectionne",
     "Meteo : clair",
     "Meteo : pluie",
     "Meteo : brouillard",
@@ -192,6 +193,14 @@ void sendAdminKick(uint16_t numId) {
   sendRaw(buffer);
 }
 
+/** Bannit (et expulse) un joueur par son numId. */
+void sendAdminBan(uint16_t numId) {
+  char buffer[128];
+  snprintf(buffer, sizeof(buffer), "{\"t\":\"ban\",\"target\":%u}",
+           static_cast<unsigned>(numId));
+  sendRaw(buffer);
+}
+
 /** Diffuse une annonce à toute la salle. */
 void sendAdminAnnounce(const std::string& text) {
   sendRaw("{\"t\":\"announce\",\"message\":\"" + escapeJson(text) + "\"}");
@@ -279,31 +288,44 @@ void executeAdminAction(const std::vector<RemotePlayer>& sorted) {
       g_adminFeedback = "Expulsion demandee (#" + std::to_string(id) + ")";
       break;
     }
-    case 1:
+    case 1: {  // Bannir
+      if (sorted.empty()) {
+        g_adminFeedback = "Aucun joueur a bannir";
+        break;
+      }
+      if (g_adminSelected >= static_cast<int>(sorted.size())) {
+        g_adminSelected = 0;
+      }
+      const uint16_t id = sorted[g_adminSelected].numId;
+      sendAdminBan(id);
+      g_adminFeedback = "Bannissement demande (#" + std::to_string(id) + ")";
+      break;
+    }
+    case 2:
       sendAdminWeather("clear");
       g_adminFeedback = "Meteo : clair";
       break;
-    case 2:
+    case 3:
       sendAdminWeather("rain");
       g_adminFeedback = "Meteo : pluie";
       break;
-    case 3:
+    case 4:
       sendAdminWeather("fog");
       g_adminFeedback = "Meteo : brouillard";
       break;
-    case 4:
+    case 5:
       sendAdminWeather("snow");
       g_adminFeedback = "Meteo : neige";
       break;
-    case 5:
+    case 6:
       sendAdminTimeDelta(60);
       g_adminFeedback = "Heure +1 h";
       break;
-    case 6:
+    case 7:
       sendAdminTimeDelta(-60);
       g_adminFeedback = "Heure -1 h";
       break;
-    case 7:  // Annonce : on ouvre la saisie du chat en mode annonce
+    case 8:  // Annonce : on ouvre la saisie du chat en mode annonce
       g_adminAnnounce = true;
       g_chatOpen = true;
       g_chatInput.clear();

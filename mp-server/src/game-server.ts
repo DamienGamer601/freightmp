@@ -25,6 +25,10 @@ export interface GameServerOptions {
   /** Si true, un jeton MP valide est obligatoire pour rejoindre. */
   requireAuth?: boolean;
   tickRate?: number;
+  /** URL de l'API FreightMP (ex. http://localhost:4000) pour la vérification des bans. */
+  apiUrl?: string;
+  /** Clé interne de l'API (header x-internal-key). */
+  internalApiKey?: string;
 }
 
 /**
@@ -337,6 +341,74 @@ export class GameServer {
         this.broadcastEnvironment(room);
         break;
       }
+      case "ban": {
+        const room = this.findRoomOfPlayer(key);
+        const player = room?.players.get(key);
+        if (!room || !player) {
+          break;
+        }
+        if (player.role !== "ADMIN" && player.role !== "MODERATOR") {
+          this.sendTo(rinfo, { t: "error", reason: "Réservé aux admins" });
+          break;
+        }
+        const targetNumId = Number(message.target);
+        const byName =
+          typeof message.username === "string" ? message.username.trim() : "";
+        let target: { key: string; userId?: string; role?: string } | null = null;
+        for (const [otherKey, other] of room.players) {
+          const matches =
+            (Number.isFinite(targetNumId) && other.numId === targetNumId) ||
+            (byName.length > 0 && other.username === byName);
+          if (matches) {
+            target = { key: otherKey, userId: other.userId, role: other.role };
+            break;
+          }
+        }
+        if (!target) {
+          this.sendTo(rinfo, { t: "error", reason: "Joueur introuvable" });
+          break;
+        }
+        if (target.key === key) {
+          this.sendTo(rinfo, { t: "error", reason: "Impossible de se bannir soi-même" });
+          break;
+        }
+        if (target.role === "ADMIN" && player.role !== "ADMIN") {
+          this.sendTo(rinfo, { t: "error", reason: "Un modérateur ne peut pas bannir un admin" });
+          break;
+        }
+        if (!target.userId) {
+          this.sendTo(rinfo, { t: "error", reason: "Joueur non authentifié (pas de compte FreightMP)" });
+          break;
+        }
+        const reason =
+          typeof message.reason === "string" && message.reason.length > 0
+            ? message.reason.slice(0, 200)
+            : "Banni par un administrateur";
+        void this.createBan(target.userId, player.userId ?? "", reason).then((ok) => {
+          if (!ok) {
+            this.sendTo(rinfo, {
+              t: "error",
+              reason: "API FreightMP injoignable : ban non enregistré",
+            });
+            return;
+          }
+          const kickedPlayer = room.players.get(target.key);
+          if (kickedPlayer) {
+            this.udp.send(
+              encode({ t: "kicked", reason: `Banni : ${reason}` }),
+              kickedPlayer.port,
+              kickedPlayer.address,
+            );
+            room.players.delete(target.key);
+          }
+          this.sendTo(rinfo, {
+            t: "admin-ok",
+            action: "ban",
+            detail: `Joueur banni : ${reason}`,
+          });
+        });
+        break;
+      }
     }
   }
 
@@ -455,6 +527,14 @@ export class GameServer {
     rinfo: RemoteInfo,
     key: string,
   ): void {
+    void this.handleJoinAsync(message, rinfo, key);
+  }
+
+  private async handleJoinAsync(
+    message: Extract<ClientMessage, { t: "join" }>,
+    rinfo: RemoteInfo,
+    key: string,
+  ): Promise<void> {
     // Jeton MP (JWT signé par l'API FreightMP).
     const auth = this.verifyMpToken(message.token);
     if (message.token && !auth) {
@@ -464,6 +544,18 @@ export class GameServer {
     if (this.options.requireAuth && !auth) {
       this.sendTo(rinfo, { t: "join-err", reason: "Authentification requise" });
       return;
+    }
+
+    // Bannissement : vérifié auprès de l'API FreightMP (si configurée).
+    if (auth?.userId) {
+      const ban = await this.checkBan(auth.userId);
+      if (ban.banned) {
+        this.sendTo(rinfo, {
+          t: "join-err",
+          reason: `Compte banni : ${ban.reason ?? "sanction active"}`,
+        });
+        return;
+      }
     }
 
     // Token partagé simple (optionnel, pour du LAN privé).
@@ -501,6 +593,7 @@ export class GameServer {
     player.truckId = message.truckId ?? auth?.username ?? player.truckId;
     if (auth) {
       player.username = auth.username;
+      player.userId = auth.userId;
       player.role = auth.role;
       player.tag = auth.tag;
       player.country = auth.country;
@@ -596,6 +689,61 @@ export class GameServer {
 
   private sendTo(rinfo: RemoteInfo, message: ServerMessage): void {
     this.udp.send(encode(message), rinfo.port, rinfo.address);
+  }
+
+  /* ---------- Bans (via l'API FreightMP) ---------- */
+
+  /** Appelle l'API interne avec la clé partagée. */
+  private async callApi(
+    path: string,
+    init?: { method?: string; body?: unknown },
+  ): Promise<unknown | null> {
+    if (!this.options.apiUrl || !this.options.internalApiKey) {
+      return null;
+    }
+    try {
+      const res = await fetch(`${this.options.apiUrl}${path}`, {
+        method: init?.method ?? "GET",
+        headers: {
+          "x-internal-key": this.options.internalApiKey,
+          ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        },
+        body: init?.body ? JSON.stringify(init.body) : undefined,
+        signal: AbortSignal.timeout(3000),
+      });
+      if (!res.ok) {
+        return null;
+      }
+      return (await res.json()) as unknown;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Vrai si le compte FreightMP est banni (actif et non expiré). */
+  private async checkBan(
+    userId: string,
+  ): Promise<{ banned: boolean; reason?: string }> {
+    const data = (await this.callApi(
+      `/api/v1/internal/bans/check?userId=${encodeURIComponent(userId)}`,
+    )) as { banned?: boolean; reason?: string } | null;
+    if (!data || !data.banned) {
+      return { banned: false };
+    }
+    return { banned: true, reason: data.reason };
+  }
+
+  /** Crée un ban via l'API interne (panneau admin in-game). */
+  private async createBan(
+    userId: string,
+    issuerId: string,
+    reason: string,
+  ): Promise<boolean> {
+    const data = (await this.callApi("/api/v1/internal/bans", {
+      method: "POST",
+      body: { userId, issuerId, reason, type: "PERMANENT" },
+    })) as { ok?: boolean } | null;
+    return data?.ok === true;
   }
 
   /* ---------- HTTP (plan de contrôle) ---------- */

@@ -6,6 +6,8 @@ const token = process.env.MP_TOKEN || undefined;
 const tickRate = Number(process.env.MP_TICK_RATE ?? "20");
 const jwtSecret = process.env.MP_JWT_SECRET || undefined;
 const requireAuth = process.env.MP_REQUIRE_AUTH === "1";
+const apiUrl = process.env.MP_API_URL || undefined;
+const internalApiKey = process.env.MP_INTERNAL_KEY || undefined;
 
 const server = new GameServer({
   udpPort,
@@ -14,6 +16,8 @@ const server = new GameServer({
   tickRate,
   jwtSecret,
   requireAuth,
+  apiUrl,
+  internalApiKey,
 });
 
 server

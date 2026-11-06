@@ -11,6 +11,8 @@ export interface Player {
   truckId: string;
   /** Pseudo FreightMP (si authentifié via jeton MP). */
   username?: string;
+  /** Identifiant du compte FreightMP (si authentifié via jeton MP). */
+  userId?: string;
   /** Rôle FreightMP (ADMIN, DRIVER…). */
   role?: string;
   /** Tag de la VTC du joueur (ex. FIC), si connu. */
